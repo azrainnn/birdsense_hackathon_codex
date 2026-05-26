@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Environment variables / secrets
+.env
+.env.local
+*.env
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Model weights & large files (add to Git LFS if needed)
+*.pt
+*.pth
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+*.weights
+*.pkl
+*.pickle
+*.joblib
+
+# Datasets & large media
+data/raw/
+data/external/
+*.csv
+*.json
+*.xml
+*.parquet
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wav
+*.mp3
+
+# Images (keep project assets but ignore large dataset images)
+datasets/
+images/raw/
+images/unlabeled/
+
+# Logs & outputs
+logs/
+*.log
+runs/
+wandb/
+mlruns/
+outputs/
+results/
+checkpoints/
+
+# IDE & editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Claude Code settings (keep project-level, ignore local overrides)
+.claude/settings.local.json
