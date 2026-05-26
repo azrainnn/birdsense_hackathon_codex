@@ -37,14 +37,15 @@ DOWNLOAD_TIMEOUT: int = 120     # seconds for .mp3 file downloads
 ACCEPTED_GRADES: frozenset[str] = frozenset({"A", "B"})
 
 
-def fetch_page(display_name: str, page: int) -> dict:
+def fetch_page(scientific_name: str, page: int) -> dict:
     """Fetch one page of Xeno-canto results for a species.
 
-    Requests Grade A/B recordings server-side via q_gt:C (better than C).
-    Client-side grade filtering in get_all_recordings() is the safety net.
+    Uses the scientific name for precision — common names can match multiple
+    unrelated species. Requests Grade A/B server-side via q_gt:C; client-side
+    filtering in get_all_recordings() is the safety net.
 
     Args:
-        display_name: Species name with spaces, e.g. "rhinoceros hornbill".
+        scientific_name: Scientific name, e.g. "Buceros rhinoceros".
         page: 1-indexed page number.
 
     Returns:
@@ -55,7 +56,7 @@ def fetch_page(display_name: str, page: int) -> dict:
         requests.RequestException: On network or timeout errors.
     """
     params = {
-        "query": f'"{display_name}" q_gt:C',
+        "query": f'"{scientific_name}" q_gt:C',
         "page": page,
     }
     response = requests.get(XC_API_URL, params=params, timeout=HTTP_TIMEOUT)
@@ -63,22 +64,21 @@ def fetch_page(display_name: str, page: int) -> dict:
     return response.json()
 
 
-def get_all_recordings(species_name: str) -> list[dict]:
+def get_all_recordings(scientific_name: str) -> list[dict]:
     """Collect all Grade A/B recording entries for a species across all API pages.
 
     Args:
-        species_name: Snake_case species name from species_list.csv.
+        scientific_name: Scientific name from species_list.csv.
 
     Returns:
         List of recording dicts from the Xeno-canto API, grade-filtered.
     """
-    display_name = species_name.replace("_", " ")
     recordings: list[dict] = []
     page = 1
 
     while True:
         try:
-            data = fetch_page(display_name, page)
+            data = fetch_page(scientific_name, page)
         except requests.RequestException as exc:
             print(f"  [ERROR] API request failed on page {page}: {exc}")
             break
@@ -125,21 +125,22 @@ def download_file(url: str, dest: Path) -> bool:
     return True
 
 
-def download_species(species_name: str, expected_count: int) -> None:
+def download_species(species_name: str, scientific_name: str, expected_count: int) -> None:
     """Download all Grade A/B recordings for one species.
 
     Creates dataset/<species_name>/ if it does not exist.
     Prints per-file progress and a summary line at the end.
 
     Args:
-        species_name: Snake_case species name; used as folder name and API query.
+        species_name: Snake_case folder name (from English Name).
+        scientific_name: Scientific name used for the API query.
         expected_count: Grade A/B count from species_list.csv (informational only).
     """
     species_dir = DATASET_DIR / species_name
     species_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"  Fetching recording list from API (CSV count: {expected_count})...")
-    recordings = get_all_recordings(species_name)
+    print(f"  Query: {scientific_name!r}  (CSV count: {expected_count})")
+    recordings = get_all_recordings(scientific_name)
     total = len(recordings)
 
     if total == 0:
@@ -223,6 +224,7 @@ def main() -> None:
 
     for idx, row in enumerate(species_rows, start=1):
         name = row["species_name"]
+        scientific = row["scientific_name"]
         count = int(row["recording_count"])
         needs_aug = row.get("augmentation_needed", "").lower() == "true"
 
@@ -231,7 +233,7 @@ def main() -> None:
         print(f"[{idx}/{total_species}] {name}{aug_tag}")
         print(f"{'─' * 60}")
 
-        download_species(name, count)
+        download_species(name, scientific, count)
         print()
 
     print(f"{'=' * 60}")

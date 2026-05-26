@@ -14,9 +14,10 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Column names in borneo_birds.csv — edit here if your CSV uses different headers
 # ---------------------------------------------------------------------------
-COL_SPECIES: str = "species_name"
-COL_GRADE_A: str = "grade_a"
-COL_GRADE_B: str = "grade_b"
+COL_SPECIES: str = "English Name"
+COL_SCIENTIFIC: str = "Scientific Name"
+COL_GRADE_A: str = "Grade A"
+COL_GRADE_B: str = "Grade B"
 
 # ---------------------------------------------------------------------------
 # Thresholds
@@ -68,14 +69,15 @@ def load_birds(path: Path) -> list[dict[str, str]]:
     if not rows:
         sys.exit(f"[ERROR] {path} is empty.")
 
-    required = {COL_SPECIES, COL_GRADE_A, COL_GRADE_B}
+    required = {COL_SPECIES, COL_SCIENTIFIC, COL_GRADE_A, COL_GRADE_B}
     present = set(rows[0].keys())
     missing = required - present
     if missing:
         sys.exit(
             f"[ERROR] {path} is missing columns: {missing}\n"
             f"        Present columns: {sorted(present)}\n"
-            f"        Expected: {COL_SPECIES}, {COL_GRADE_A}, {COL_GRADE_B}\n"
+            f"        Expected: {COL_SPECIES!r}, {COL_SCIENTIFIC!r}, "
+            f"{COL_GRADE_A!r}, {COL_GRADE_B!r}\n"
             "        Update the COL_* constants at the top of this script if your "
             "CSV uses different header names."
         )
@@ -113,6 +115,7 @@ def filter_species(rows: list[dict[str, str]]) -> list[dict]:
         selected.append(
             {
                 "species_name": to_snake_case(raw_name),
+                "scientific_name": row[COL_SCIENTIFIC].strip(),
                 "recording_count": count,
                 "augmentation_needed": count < AUGMENTATION_THRESHOLD,
             }
@@ -135,7 +138,7 @@ def write_species_list(species: list[dict], path: Path) -> None:
         species: Filtered and normalised species rows.
         path: Destination path for species_list.csv.
     """
-    fieldnames = ["species_name", "recording_count", "augmentation_needed"]
+    fieldnames = ["species_name", "scientific_name", "recording_count", "augmentation_needed"]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -157,11 +160,14 @@ def print_summary(species: list[dict]) -> None:
         f"{len(needs_aug)} need augmentation (< {AUGMENTATION_THRESHOLD} recordings)"
     )
     print()
-    print(f"  {'Species':<45} {'Count':>6}  Augment?")
-    print("  " + "-" * 58)
+    print(f"  {'Species (folder name)':<40} {'Scientific Name':<35} {'Count':>6}  Augment?")
+    print("  " + "-" * 88)
     for s in species:
         flag = "YES" if s["augmentation_needed"] else "no"
-        print(f"  {s['species_name']:<45} {s['recording_count']:>6}  {flag}")
+        print(
+            f"  {s['species_name']:<40} {s['scientific_name']:<35} "
+            f"{s['recording_count']:>6}  {flag}"
+        )
 
 
 def main() -> None:
