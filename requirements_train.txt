@@ -1,0 +1,18 @@
+# Training-environment dependencies (Google Colab / GPU machine)
+# Install with: pip install -r requirements_train.txt
+# Do NOT install on Raspberry Pi — see deployment environment in CLAUDE.md
+
+# Data collection
+requests>=2.31
+
+# Audio & feature extraction (add when writing preprocess.py)
+# librosa>=0.10
+# soundfile>=0.12
+
+# Deep learning (add when writing train.py)
+# torch>=2.2
+# torchvision>=0.17
+# torchaudio>=2.2
+
+# Metrics (add when writing evaluate.py)
+# scikit-learn>=1.4
