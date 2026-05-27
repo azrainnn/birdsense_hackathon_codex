@@ -120,6 +120,16 @@ TARGET_F1: float = 0.80        # Minimum macro-F1 required before exporting mode
 
 ---
 
+## Script Documentation Rule
+
+`SCRIPTS.md` (project root) is the human-readable reference for every script in `scripts/`. You must keep it up to date automatically:
+
+- **When you add a new script** to `scripts/`, append a new section to `SCRIPTS.md` following the same structure as the existing entries (Purpose, Run, Inputs/Outputs, Key constants, Functions table, and any relevant notes).
+- **When you modify an existing script** in any meaningful way (new function, changed constant, changed behaviour), update the corresponding section in `SCRIPTS.md` to reflect the change.
+- Do this as part of the same task — never leave `SCRIPTS.md` out of sync with the actual scripts.
+
+---
+
 ## What NOT To Do
 
 - **Do not train on the Raspberry Pi.** The RPi is inference-only. All training and export happens on Colab or a GPU machine.
