@@ -20,6 +20,8 @@ import sys
 import time
 from pathlib import Path
 
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import requests
 
 # ---------------------------------------------------------------------------
