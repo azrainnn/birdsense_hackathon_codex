@@ -43,6 +43,9 @@ ENV/
 data/raw/
 data/external/
 *.csv
+# Allow small config/metadata CSVs that belong in version control
+!species_list.csv
+!species_selected.csv
 *.json
 *.xml
 *.parquet

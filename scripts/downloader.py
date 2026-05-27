@@ -1,11 +1,11 @@
 """
-Download Xeno-canto Grade A/B recordings for species in species_list.csv.
+Download Xeno-canto Grade A/B recordings for species in species_selected.csv.
 
-Saves .mp3 files to dataset/<species_name>/.
+Saves .mp3 files to dataset/raw/<species_name>/.
 Safe to re-run: already-downloaded files are skipped by filename.
 
-Input:  species_list.csv  (project root, produced by species_selector.py)
-Output: dataset/<species_name>/*.mp3
+Input:  species_selected.csv  (project root)
+Output: dataset/raw/<species_name>/*.mp3
 """
 
 import csv
@@ -18,8 +18,8 @@ import requests
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-SPECIES_LIST_CSV: Path = Path("species_list.csv")
-DATASET_DIR: Path = Path("dataset")
+SPECIES_LIST_CSV: Path = Path("species_selected.csv")
+DATASET_DIR: Path = Path("dataset/raw")
 
 # ---------------------------------------------------------------------------
 # Xeno-canto API
@@ -199,7 +199,7 @@ def load_species_list(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         sys.exit(
             f"[ERROR] {path} not found.\n"
-            "        Run species_selector.py first."
+            "        Ensure species_selected.csv exists in the project root."
         )
 
     with path.open(newline="", encoding="utf-8") as f:
