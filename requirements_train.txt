@@ -5,9 +5,9 @@
 # Data collection
 requests>=2.31
 
-# Audio & feature extraction (add when writing preprocess.py)
-# librosa>=0.10
-# soundfile>=0.12
+# Audio & feature extraction
+librosa>=0.10
+soundfile>=0.12
 
 # Deep learning (add when writing train.py)
 # torch>=2.2
