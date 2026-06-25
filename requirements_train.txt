@@ -9,10 +9,9 @@ requests>=2.31
 librosa>=0.10
 soundfile>=0.12
 
-# Deep learning (add when writing train.py)
-# torch>=2.2
-# torchvision>=0.17
-# torchaudio>=2.2
+# Deep learning — YAMNet fine-tuning and TFLite export
+tensorflow>=2.21
+tensorflow-hub>=0.16
 
-# Metrics (add when writing evaluate.py)
-# scikit-learn>=1.4
+# Metrics
+scikit-learn>=1.4
