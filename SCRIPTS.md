@@ -45,8 +45,9 @@ Scripts to be added in later phases: `train.py`, `evaluate.py`, `export.py`.
 | `N_MELS` | `128` | mel filterbank bins |
 | `HOP_LENGTH` | `512` | STFT hop size |
 | `N_FFT` | `1024` | STFT window size |
-| `NUM_SPECIES` | `15` | number of output classes |
+| `NUM_SPECIES` | `15` | output classes — provisional; update once species list is finalised (target: 25–30) |
 | `TARGET_F1` | `0.80` | minimum macro-F1 required before exporting |
+| `SILENCE_THRESHOLD` | `0.01` | RMS threshold for noise gate in preprocess.py; windows below this are dropped |
 
 ---
 
@@ -212,10 +213,11 @@ python scripts/preprocess.py
 | Function | What it does |
 |---|---|
 | `load_audio(path)` | Loads `.mp3` with librosa, resamples to `SAMPLE_RATE`, returns mono float32 array |
+| `is_near_silent(window, threshold)` | Returns `True` if a window's RMS is below `SILENCE_THRESHOLD`; used to drop near-silent clips before writing |
 | `extract_windows(audio)` | Slices audio into non-overlapping 5s windows; short recordings are zero-padded to one full window; trailing remainder is discarded |
-| `preprocess_species(species_name)` | Processes all `.mp3` files for one species and writes windowed `.wav` clips |
+| `preprocess_species(species_name)` | Processes all `.mp3` files for one species, applies noise gate, and writes windowed `.wav` clips; returns `(written, skipped, failed, dropped_silent)` |
 | `load_species_list(path)` | Loads `species_selected.csv` |
-| `main()` | Entry point — iterates all species and reports written/skipped/failed counts |
+| `main()` | Entry point — iterates all species and reports written/skipped/silent-dropped/failed counts |
 
 **Naming convention for output clips:**
 

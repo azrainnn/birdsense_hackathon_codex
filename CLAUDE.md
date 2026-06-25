@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Summary
 
-BirdSense is an AI-powered field bird species detector built around a portable Raspberry Pi 5 device. It listens to ambient forest sounds, extracts mel-spectrogram features in real time, and classifies Bornean bird species using a lightweight TFLite model — all without internet connectivity. The project spans three phases: Phase 1 builds the dataset and trains the classifier on Google Colab; Phase 2 deploys the inference pipeline onto the Raspberry Pi with audio capture and local logging; Phase 3 adds cloud sync, a monitoring dashboard, and CI/CD automation.
+BirdSense is an AI-powered bird species identification system for Bornean birds. The primary deliverable (Phase 1) is a **web dashboard** where a user uploads an audio recording and receives the predicted species, confidence score, and spectrogram visualisation — no hardware required. Phase 2 (optional, post-FYP) extends the same trained model to a portable Raspberry Pi device for real-time in-field detection.
+
+The ML pipeline (preprocessing → model → inference) is kept modular and separate from the interface layer so that Phase 2 adds only a new input/output layer rather than redesigning the core logic.
 
 ---
 
@@ -16,16 +18,28 @@ Maintain this layout from day one. Do not reorganise without updating this file.
 birdsense/
 ├── dataset/
 │   ├── raw/                  # Original Xeno-canto downloads (never modified)
-│   └── processed/            # Resampled, trimmed clips ready for feature extraction
-│       └── <species_name>/   # Folder name = class label (snake_case)
+│   ├── processed/            # Resampled, windowed .wav clips ready for training
+│   │   └── <species_name>/   # Folder name = class label (snake_case)
+│   └── test_holdout/         # 15% held out before preprocessing — never touched by training
+│       └── <species_name>/
 ├── scripts/
-│   ├── download_data.py      # Xeno-canto API download + filtering
-│   ├── preprocess.py         # Resample, trim, augment
-│   ├── train.py              # Model training entry point
-│   ├── evaluate.py           # Metrics, confusion matrix, export decision
-│   └── export.py             # PyTorch → ONNX → TFLite conversion
+│   ├── constants.py          # Single source of truth for shared numeric constants
+│   ├── species_selector.py   # Filter borneo_birds.csv → species_list.csv
+│   ├── downloader.py         # Xeno-canto API download + filtering
+│   ├── split_holdout.py      # Move 15% of raw files to test_holdout/ (run before preprocess)
+│   ├── preprocess.py         # Resample, noise-gate, window → processed/
+│   ├── train.py              # Model fine-tuning entry point (Colab)
+│   ├── evaluate.py           # Metrics, confusion matrix, SNR field test, export gate
+│   └── export.py             # Trained model → TFLite
+├── backend/
+│   ├── app.py                # Flask app — POST /predict, GET /history
+│   ├── inference.py          # Load TFLite model, run prediction
+│   ├── preprocessing.py      # Audio → mel-spectrogram (reusable, no Flask imports)
+│   └── birdsense.db          # SQLite — stores prediction metadata (git-ignored)
+├── frontend/
+│   └── src/                  # React upload form + results dashboard
 ├── models/
-│   ├── checkpoints/          # .pt files saved during training
+│   ├── checkpoints/          # .pt files saved during training (git-ignored)
 │   └── export/               # Final .tflite and labels.txt
 ├── notebooks/
 │   └── *.ipynb               # Colab exploratory work only — no production logic here
@@ -34,17 +48,18 @@ birdsense/
 │   ├── test_model.py
 │   └── test_inference.py
 ├── CLAUDE.md
+├── SCRIPTS.md
 ├── .gitignore
 └── requirements_train.txt    # Training-environment deps (Colab)
 ```
 
-> `dataset/raw/` and `models/checkpoints/` are git-ignored. Use Git LFS or cloud storage for large binaries.
+> `dataset/raw/`, `dataset/test_holdout/`, `models/checkpoints/`, and `backend/birdsense.db` are git-ignored. Use Git LFS or cloud storage for large binaries.
 
 ---
 
 ## Tech Stack
 
-### Training Environment (Google Colab / local GPU)
+### Phase 1 — Training (Google Colab / local GPU)
 
 | Purpose | Library |
 |---|---|
@@ -52,20 +67,27 @@ birdsense/
 | Audio loading & feature extraction | librosa ≥ 0.10 |
 | Metrics & preprocessing utilities | scikit-learn ≥ 1.4 |
 | Spectrogram augmentation | torchaudio |
-| Model export | torch.onnx → ai-edge-torch / tf-nightly |
-| Experiment tracking | (Phase 3 — Weights & Biases) |
+| Model export | torch.onnx → TFLite via ai-edge-torch / tf-nightly |
 
-### Deployment Environment (Raspberry Pi 5)
+### Phase 1 — Web Application
+
+| Purpose | Library / Framework |
+|---|---|
+| Backend API | Flask |
+| Frontend | React |
+| Database | SQLite (stdlib `sqlite3`) |
+| On-server inference | TFLite runtime |
+
+### Phase 2 — Raspberry Pi (Optional, post-FYP)
 
 | Purpose | Library |
 |---|---|
-| Model inference | tflite-runtime (not full TensorFlow) |
+| On-device inference | tflite-runtime |
 | Live audio capture | sounddevice |
 | Feature extraction | numpy + scipy (no librosa on RPi) |
-| Result persistence | SQLite via sqlite3 (stdlib) |
-| Hardware GPIO (Phase 2) | RPi.GPIO or gpiozero |
+| Result persistence | SQLite via sqlite3 |
 
-Keep these two environments **strictly separate**. No PyTorch imports in deployment code; no sounddevice imports in training code.
+Keep training and deployment environments **strictly separate**. No PyTorch imports in Flask/RPi code; no sounddevice imports in training code.
 
 ---
 
@@ -82,50 +104,85 @@ Keep these two environments **strictly separate**. No PyTorch imports in deploym
 
 ## Key Constants
 
-Define these in a shared `scripts/constants.py` and import from there. Do not redefine inline.
+Define these in `scripts/constants.py` and import from there. Do not redefine inline.
 
 ```python
-SAMPLE_RATE: int = 16000       # Hz — resample all audio to this
-DURATION: int = 5              # seconds — fixed clip length for model input
-N_MELS: int = 128              # mel filterbank bins
-HOP_LENGTH: int = 512          # STFT hop size
-N_FFT: int = 1024              # STFT window size
-NUM_SPECIES: int = ...         # TBD — set once species list is finalised
-TARGET_F1: float = 0.80        # Minimum macro-F1 required before exporting model
+SAMPLE_RATE: int = 16000          # Hz — resample all audio to this
+DURATION: int = 5                 # seconds — fixed clip length for model input
+N_MELS: int = 128                 # mel filterbank bins
+HOP_LENGTH: int = 512             # STFT hop size
+N_FFT: int = 1024                 # STFT window size
+NUM_SPECIES: int = ...            # Set once species list is finalised (target: 25–30)
+TARGET_F1: float = 0.80           # Minimum macro-F1 required before exporting model
+SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below are dropped
 ```
 
-`NUM_SPECIES` must be set before training begins. It controls the final classifier head size and the `labels.txt` exported alongside the `.tflite` file.
+`NUM_SPECIES` controls the final classifier head size and the `labels.txt` exported alongside the `.tflite` file. Do not train until this is set.
 
 ---
 
 ## Data Rules
 
 1. **Source:** Xeno-canto only. Accept Grade **A** and **B** recordings. Reject C/D/E.
-2. **Minimum per species:** 20 original recordings before augmentation. Do not proceed to training with fewer.
-3. **Folder = label:** `dataset/processed/<species_name>/` where `species_name` is the class label in `snake_case` (e.g. `rhinoceros_hornbill`). The folder name is the ground-truth label — keep it consistent.
-4. **Preprocessing:** resample to `SAMPLE_RATE`, trim or pad to exactly `DURATION` seconds, then generate the mel-spectrogram. Store processed clips as `.wav`; do not store spectrograms on disk (generate at training time).
-5. **Augmentation** (training split only): time-stretch ±10%, pitch-shift ±2 semitones, add Gaussian noise (σ = 0.005), SpecAugment (frequency and time masking). Never augment the validation or test splits.
-6. **Split:** 70 / 15 / 15 train / val / test. Stratify by species. Fix `random_state=42`.
+2. **Target species count:** 25–30 species. Prioritise iconic or acoustically distinctive Bornean birds (hornbills, pittas, babblers). Current status: 15 species downloaded — expand before training.
+3. **Minimum per species:** 20 original recordings before augmentation. Do not proceed to training with fewer.
+4. **Tiered augmentation rule:**
+   - ≥ 50 Grade A/B recordings → use as-is, no augmentation required
+   - 20–49 recordings → apply augmentation to reach sufficient sample count
+   - < 20 recordings → exclude the species
+5. **Folder = label:** `dataset/processed/<species_name>/` where `species_name` is the class label in `snake_case` (e.g. `rhinoceros_hornbill`). The folder name is the ground-truth label — keep it consistent.
+6. **Preprocessing pipeline (in order):**
+   1. Load .mp3, resample to `SAMPLE_RATE`, convert to mono
+   2. Apply noise gate: drop any 5-second window whose RMS is below `SILENCE_THRESHOLD`
+   3. Slice into non-overlapping `DURATION`-second windows; zero-pad short recordings to one full window
+   4. Write as 16-bit PCM `.wav` to `dataset/processed/<species>/`
+   5. Spectrograms are **not** stored on disk — generated at training time
+7. **Holdout split:** run `split_holdout.py` **before** `preprocess.py`. It physically moves 15% of raw `.mp3` files per species to `dataset/test_holdout/`. These files are never preprocessed and never seen during training.
+8. **Train/val split:** after preprocessing, split `dataset/processed/` 82/18 train/val (stratified by species, `random_state=42`). The 15% holdout in `test_holdout/` is the true test set, kept separate until final evaluation.
+9. **Augmentation** (training split only, applied at load time during training):
+   - Pitch shift ±2 semitones
+   - Time stretch ±15%
+   - Add background forest noise (Freesound.org ambience clips)
+   - Random volume change ±6 dB
+   - Never augment the val or test splits.
 
 ---
 
 ## Model Rules
 
-1. **Architecture:** EfficientNet-B0 pretrained on ImageNet (via `torchvision.models`). Treat the mel-spectrogram as a 3-channel image by repeating the single channel.
-2. **Fine-tuning strategy:** freeze the entire feature extractor backbone. Replace and train only the final classifier head (`model.classifier`). Unfreeze the full network only if val-F1 plateaus below `TARGET_F1` after 20 epochs.
-3. **Input shape:** `(batch, 3, 128, 128)` — resize spectrograms to 128×128 before feeding.
-4. **Loss:** `CrossEntropyLoss` with label smoothing = 0.1.
+1. **Architecture:** Fine-tuned **YAMNet** — a CNN pre-trained on AudioSet that already understands general audio features. Freeze the CNN backbone; replace and train only the final classification head for the Bornean species set.
+2. **Input:** mel-spectrogram of shape `(128, 313)` — 128 mel bins × 313 time frames for a 5-second clip at 16 kHz with the constants defined above.
+3. **Loss:** `CrossEntropyLoss` with label smoothing = 0.1.
+4. **Unfreezing:** only unfreeze the backbone if val-F1 plateaus below `TARGET_F1` after 20 epochs. Document the decision in the commit message.
 5. **Export gate:** run `evaluate.py` on the held-out test set. Only call `export.py` if macro-F1 ≥ `TARGET_F1`. Commit the evaluation report alongside the exported model.
 6. **Export format:** `.tflite` (INT8 quantised where possible). Save `models/export/model.tflite` and `models/export/labels.txt` (one species per line, matching class index order).
+7. **Field evaluation:** test at simulated SNR levels — 20 dB (quiet), 10 dB (moderate), 5 dB (loud background). Report accuracy and F1 per noise level. Target: > 80% F1 at 20 dB, > 65% F1 at 10 dB.
+
+---
+
+## Flask Backend Rules
+
+- `backend/preprocessing.py` contains the audio → mel-spectrogram function. It has **no Flask imports** — it must be callable from the RPi in Phase 2 without modification.
+- `backend/inference.py` loads the `.tflite` model at startup and exposes a single `predict(spectrogram) → (species, confidence)` function.
+- `backend/app.py` wires these together. The `/predict` route must not contain any ML logic itself.
+- API response envelope:
+  ```json
+  {
+    "species": "Rhinoceros Hornbill",
+    "confidence": 0.92,
+    "spectrogram_url": "/spectrograms/<id>.png"
+  }
+  ```
+- Store uploaded audio in `backend/uploads/`, generated spectrogram images in `backend/spectrograms/`, and prediction metadata in `backend/birdsense.db`.
 
 ---
 
 ## Script Documentation Rule
 
-`SCRIPTS.md` (project root) is the human-readable reference for every script in `scripts/`. You must keep it up to date automatically:
+`SCRIPTS.md` (project root) is the human-readable reference for every script in `scripts/`. Keep it up to date automatically:
 
-- **When you add a new script** to `scripts/`, append a new section to `SCRIPTS.md` following the same structure as the existing entries (Purpose, Run, Inputs/Outputs, Key constants, Functions table, and any relevant notes).
-- **When you modify an existing script** in any meaningful way (new function, changed constant, changed behaviour), update the corresponding section in `SCRIPTS.md` to reflect the change.
+- **When you add a new script** to `scripts/`, append a new section to `SCRIPTS.md` following the same structure as existing entries.
+- **When you modify an existing script** in any meaningful way (new function, changed constant, changed behaviour), update the corresponding section in `SCRIPTS.md`.
 - Do this as part of the same task — never leave `SCRIPTS.md` out of sync with the actual scripts.
 
 ---
@@ -133,34 +190,44 @@ TARGET_F1: float = 0.80        # Minimum macro-F1 required before exporting mode
 ## What NOT To Do
 
 - **Do not train on the Raspberry Pi.** The RPi is inference-only. All training and export happens on Colab or a GPU machine.
-- **Do not install full TensorFlow on the RPi.** Use `tflite-runtime` only — the binary footprint of full TF will not fit comfortably and is unnecessary.
+- **Do not install full TensorFlow on the RPi.** Use `tflite-runtime` only.
 - **Do not skip evaluation before export.** Never run `export.py` without first running `evaluate.py` and confirming F1 ≥ `TARGET_F1` on the test set.
-- **Do not commit raw audio or model checkpoints to git.** These go in `dataset/raw/` and `models/checkpoints/` which are git-ignored.
-- **Do not put production logic in notebooks.** Notebooks in `notebooks/` are for exploration and visualisation only. Finalised logic must be moved to `scripts/`.
+- **Do not commit raw audio, holdout audio, or model checkpoints to git.** These are git-ignored.
+- **Do not put production logic in notebooks.** Notebooks are for exploration only. Finalised logic must be in `scripts/` or `backend/`.
 - **Do not hardcode species names or class indices** outside of `labels.txt` and `constants.py`.
+- **Do not run `preprocess.py` before `split_holdout.py`.** The holdout must be physically moved first so preprocessed clips do not include test data.
+- **Do not augment validation or test splits.**
 
 ---
 
 ## Phase Status
 
-Update this section as phases are completed.
-
 | Phase | Description | Status |
 |---|---|---|
-| **Phase 1** | Data collection, preprocessing, model training & export | 🟡 In progress |
-| **Phase 2** | Raspberry Pi hardware setup, real-time inference pipeline, SQLite logging | ⬜ Not started |
-| **Phase 3** | Cloud sync, monitoring dashboard, CI/CD | ⬜ Not started |
+| **Phase 1** | Data pipeline → YAMNet fine-tuning → Flask API → React dashboard | 🟡 In progress |
+| **Phase 2** | Optional — Raspberry Pi real-time inference, on-device detection loop | ⬜ Not started |
 
 ### Phase 1 Checklist
-- [ ] Species list finalised — set `NUM_SPECIES` in `constants.py`
-- [ ] Xeno-canto download script complete (`scripts/download_data.py`)
-- [ ] Preprocessing pipeline complete (`scripts/preprocess.py`)
-- [ ] ≥ 20 Grade A/B recordings per species confirmed
-- [ ] Training script complete (`scripts/train.py`)
+
+**Data**
+- [ ] Species list expanded to 25–30 species — `NUM_SPECIES` set in `constants.py`
+- [x] Xeno-canto download script complete (`scripts/downloader.py`)
+- [ ] ≥ 20 Grade A/B recordings per species confirmed for all 25–30 species
+- [ ] `split_holdout.py` run — 15% test files moved to `dataset/test_holdout/`
+- [ ] `preprocess.py` run — processed clips in `dataset/processed/`
+
+**Model**
+- [ ] Training script complete (`scripts/train.py`) — YAMNet fine-tuning
 - [ ] Val-F1 ≥ 0.80 achieved
-- [ ] Evaluation report generated (`scripts/evaluate.py`)
+- [ ] Evaluation report generated (`scripts/evaluate.py`) — including SNR field test
 - [ ] Model exported to `.tflite` (`scripts/export.py`)
 - [ ] `models/export/model.tflite` and `labels.txt` committed
+
+**Web Application**
+- [ ] Flask backend complete (`backend/app.py`, `inference.py`, `preprocessing.py`)
+- [ ] React frontend complete — upload form + results dashboard
+- [ ] SQLite schema set up (`backend/birdsense.db`)
+- [ ] End-to-end demo working (upload audio → species + confidence + spectrogram)
 
 ---
 

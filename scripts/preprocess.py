@@ -20,7 +20,7 @@ import librosa
 import numpy as np
 import soundfile as sf
 
-from constants import DURATION, SAMPLE_RATE
+from constants import DURATION, SAMPLE_RATE, SILENCE_THRESHOLD
 
 SPECIES_CSV: Path = Path("species_selected.csv")
 RAW_DIR: Path = Path("dataset/raw")
@@ -39,6 +39,20 @@ def load_audio(path: Path) -> np.ndarray:
     """
     audio, _ = librosa.load(path, sr=SAMPLE_RATE, mono=True)
     return audio
+
+
+def is_near_silent(window: np.ndarray, threshold: float = SILENCE_THRESHOLD) -> bool:
+    """Return True if the window's RMS amplitude is below the noise-gate threshold.
+
+    Args:
+        window: Fixed-length float32 audio array (TARGET_SAMPLES,).
+        threshold: RMS level below which the window is considered near-silent.
+
+    Returns:
+        True if the window should be discarded (too quiet), False if it should be kept.
+    """
+    rms = float(np.sqrt(np.mean(window ** 2)))
+    return rms < threshold
 
 
 def extract_windows(audio: np.ndarray) -> list[np.ndarray]:
@@ -66,14 +80,14 @@ def extract_windows(audio: np.ndarray) -> list[np.ndarray]:
     ]
 
 
-def preprocess_species(species_name: str) -> tuple[int, int, int]:
+def preprocess_species(species_name: str) -> tuple[int, int, int, int]:
     """Process all raw recordings for one species.
 
     Args:
         species_name: Snake_case species folder name.
 
     Returns:
-        Tuple of (clips_written, clips_skipped_existing, files_failed).
+        Tuple of (clips_written, clips_skipped_existing, files_failed, windows_dropped_silent).
     """
     raw_dir = RAW_DIR / species_name
     out_dir = PROCESSED_DIR / species_name
@@ -81,14 +95,14 @@ def preprocess_species(species_name: str) -> tuple[int, int, int]:
 
     if not raw_dir.exists():
         print(f"  [WARN] {raw_dir} does not exist — skipping.")
-        return 0, 0, 0
+        return 0, 0, 0, 0
 
     mp3_files = sorted(raw_dir.glob("*.mp3"))
     if not mp3_files:
         print(f"  [WARN] No .mp3 files in {raw_dir} — run downloader.py and split_holdout.py first.")
-        return 0, 0, 0
+        return 0, 0, 0, 0
 
-    written = skipped = failed = 0
+    written = skipped = failed = dropped_silent = 0
 
     for mp3 in mp3_files:
         try:
@@ -101,6 +115,9 @@ def preprocess_species(species_name: str) -> tuple[int, int, int]:
         windows = extract_windows(audio)
 
         for idx, window in enumerate(windows):
+            if is_near_silent(window):
+                dropped_silent += 1
+                continue
             out_path = out_dir / f"{mp3.stem}_{idx:02d}.wav"
             if out_path.exists():
                 skipped += 1
@@ -108,7 +125,7 @@ def preprocess_species(species_name: str) -> tuple[int, int, int]:
             sf.write(out_path, window, SAMPLE_RATE, subtype="PCM_16")
             written += 1
 
-    return written, skipped, failed
+    return written, skipped, failed, dropped_silent
 
 
 def load_species_list(path: Path) -> list[dict[str, str]]:
@@ -145,24 +162,30 @@ def main() -> None:
     print(f"Window : {DURATION}s  |  Sample rate : {SAMPLE_RATE} Hz")
     print()
 
-    total_written = total_skipped = total_failed = 0
+    total_written = total_skipped = total_failed = total_dropped = 0
 
     for idx, row in enumerate(species_rows, start=1):
         name = row["species_name"]
         print(f"[{idx}/{len(species_rows)}] {name}")
 
-        written, skipped, failed = preprocess_species(name)
+        written, skipped, failed, dropped = preprocess_species(name)
         total_written += written
         total_skipped += skipped
         total_failed += failed
+        total_dropped += dropped
 
-        print(f"  >> {written} clips written  |  {skipped} already existed  |  {failed} failed")
+        print(
+            f"  >> {written} clips written  |  {skipped} already existed  "
+            f"|  {dropped} silent dropped  |  {failed} failed"
+        )
         print()
 
     print("=" * 60)
     print(f"Done. {total_written} new clips in {PROCESSED_DIR}/")
     if total_skipped:
         print(f"      {total_skipped} clips skipped (already existed).")
+    if total_dropped:
+        print(f"      {total_dropped} near-silent windows dropped by noise gate.")
     if total_failed:
         print(f"[WARN] {total_failed} files failed — check logs above.")
 
