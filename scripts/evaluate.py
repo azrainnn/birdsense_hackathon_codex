@@ -16,6 +16,7 @@ Run from project root:
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import librosa
 import numpy as np
@@ -71,7 +72,7 @@ def extract_windows(audio: np.ndarray) -> list[np.ndarray]:
 
 def predict_file(
     path: Path,
-    yamnet: hub.Module,
+    yamnet: Any,
     head: tf.keras.Model,
     num_classes: int,
 ) -> np.ndarray:

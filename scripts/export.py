@@ -16,6 +16,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
@@ -58,7 +59,7 @@ class BirdClassifier(tf.Module):
     single exportable tf.Module suitable for TFLite conversion.
     """
 
-    def __init__(self, yamnet: hub.Module, head: tf.keras.Model) -> None:
+    def __init__(self, yamnet: Any, head: tf.keras.Model) -> None:
         """Initialise with loaded YAMNet and classifier head.
 
         Args:
