@@ -20,6 +20,7 @@ import csv
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import soundfile as sf
@@ -101,7 +102,7 @@ def collect_files(
 
 
 def extract_embeddings(
-    yamnet: hub.Module,
+    yamnet: Any,
     file_paths: list[str],
     cache_dir: Path,
 ) -> np.ndarray:
