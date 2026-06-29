@@ -2,8 +2,9 @@
 Evaluate the trained classifier on the held-out test set.
 
 For each MP3 in dataset/test_holdout/<species>/, applies the same windowing
-and noise-gate as preprocess.py, extracts YAMNet embeddings, runs the
-classifier head, and aggregates window-level predictions per file.
+and noise-gate as preprocess.py, computes a mel-spectrogram for each window,
+runs the full EfficientNetB0 model, and aggregates predictions per file via
+majority vote.
 
 Reports per-species precision, recall, and F1. Checks whether macro-F1
 meets TARGET_F1 (the export gate). Saves the report to
@@ -16,36 +17,33 @@ Run from project root:
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import librosa
 import numpy as np
 import tensorflow as tf
-import tensorflow_hub as hub
 from sklearn.metrics import classification_report, f1_score
 
 sys.path.insert(0, str(Path(__file__).parent))
-from constants import DURATION, SAMPLE_RATE, SILENCE_THRESHOLD, TARGET_F1
+from constants import DURATION, HOP_LENGTH, N_FFT, N_MELS, SAMPLE_RATE, SILENCE_THRESHOLD, TARGET_F1
 
-YAMNET_URL: str = "https://tfhub.dev/google/yamnet/1"
 _ROOT: Path = Path(__file__).parent.parent
 HOLDOUT_DIR: Path = _ROOT / "dataset" / "test_holdout"
 CHECKPOINT_DIR: Path = _ROOT / "models" / "checkpoints"
 
-EMBEDDING_DIM: int = 1024
-TARGET_SAMPLES: int = DURATION * SAMPLE_RATE
+IMG_H: int = 128
+IMG_W: int = 128
+WINDOW_SAMPLES: int = DURATION * SAMPLE_RATE
 
 
-def load_label_map(checkpoint_dir: Path) -> tuple[list[str], dict[str, int]]:
+def load_label_map(path: Path) -> tuple[list[str], dict[str, int]]:
     """Load class names and label-to-index map saved by train.py.
 
     Args:
-        checkpoint_dir: Path to models/checkpoints/.
+        path: Path to label_map.json.
 
     Returns:
         Tuple of (class_names, label_to_idx).
     """
-    path = checkpoint_dir / "label_map.json"
     if not path.exists():
         sys.exit(f"[ERROR] {path} not found. Run train.py first.")
     with path.open() as f:
@@ -53,143 +51,133 @@ def load_label_map(checkpoint_dir: Path) -> tuple[list[str], dict[str, int]]:
     return data["class_names"], data["label_to_idx"]
 
 
-def extract_windows(audio: np.ndarray) -> list[np.ndarray]:
-    """Slice audio into non-overlapping 5-second windows.
+def waveform_to_spectrogram(waveform: np.ndarray) -> np.ndarray:
+    """Convert a waveform array to a normalized (IMG_H, IMG_W, 3) mel-spectrogram.
 
     Args:
-        audio: Mono float32 audio array at SAMPLE_RATE.
+        waveform: Mono float32 audio array at SAMPLE_RATE.
 
     Returns:
-        List of (TARGET_SAMPLES,) float32 arrays.
+        Float32 array of shape (IMG_H, IMG_W, 3).
     """
-    if len(audio) < TARGET_SAMPLES:
-        padded = np.zeros(TARGET_SAMPLES, dtype=np.float32)
-        padded[: len(audio)] = audio
-        return [padded]
-    n = len(audio) // TARGET_SAMPLES
-    return [audio[i * TARGET_SAMPLES : (i + 1) * TARGET_SAMPLES] for i in range(n)]
+    mel = librosa.feature.melspectrogram(
+        y=waveform, sr=SAMPLE_RATE,
+        n_mels=N_MELS, n_fft=N_FFT, hop_length=HOP_LENGTH,
+    )
+    mel_db = librosa.power_to_db(mel, ref=np.max)
+    mel_norm = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-6)
+    mel_resized = tf.image.resize(mel_norm[..., np.newaxis], [IMG_H, IMG_W]).numpy()
+    return np.concatenate([mel_resized] * 3, axis=-1).astype(np.float32)
 
 
-def predict_file(
-    path: Path,
-    yamnet: Any,
-    head: tf.keras.Model,
-    num_classes: int,
-) -> np.ndarray:
-    """Predict class probability vector for a single audio file.
-
-    Loads the file, windows it, drops near-silent windows, extracts YAMNet
-    embeddings for each valid window, and returns the mean softmax probability
-    vector across all windows.
+def predict_file(model: tf.keras.Model, mp3_path: Path, num_classes: int) -> int:
+    """Predict species for one MP3 via majority vote over 5-second windows.
 
     Args:
-        path: Path to the audio file (.mp3 or .wav).
-        yamnet: Loaded YAMNet module.
-        head: Trained classifier head model.
-        num_classes: Number of output classes (used for fallback shape).
+        model: Loaded full Keras model.
+        mp3_path: Path to holdout .mp3 file.
+        num_classes: Number of output classes (used for silent-file fallback).
 
     Returns:
-        Mean softmax probability array of shape (num_classes,).
-        Returns uniform distribution on load failure.
+        Predicted integer class index, or 0 on total load/silent failure.
     """
     try:
-        audio, _ = librosa.load(str(path), sr=SAMPLE_RATE, mono=True)
+        audio, _ = librosa.load(str(mp3_path), sr=SAMPLE_RATE, mono=True)
     except Exception as exc:
-        print(f"  [FAIL] {path.name}: {exc}")
-        return np.full(num_classes, 1.0 / num_classes, dtype=np.float32)
+        print(f"  [FAIL] {mp3_path.name}: {exc}")
+        return 0
 
-    valid_windows = [
-        w for w in extract_windows(audio)
-        if float(np.sqrt(np.mean(w ** 2))) >= SILENCE_THRESHOLD
-    ]
-    if not valid_windows:
-        return np.full(num_classes, 1.0 / num_classes, dtype=np.float32)
+    votes: list[int] = []
+    for start in range(0, len(audio), WINDOW_SAMPLES):
+        chunk = audio[start : start + WINDOW_SAMPLES]
+        if len(chunk) < WINDOW_SAMPLES:
+            chunk = np.pad(chunk, (0, WINDOW_SAMPLES - len(chunk)))
+        if float(np.sqrt(np.mean(chunk ** 2))) < SILENCE_THRESHOLD:
+            continue
+        spec = waveform_to_spectrogram(chunk)[np.newaxis]  # (1, H, W, 3)
+        probs = model(spec, training=False).numpy()[0]
+        votes.append(int(np.argmax(probs)))
 
-    embeddings = np.zeros((len(valid_windows), EMBEDDING_DIM), dtype=np.float32)
-    for i, window in enumerate(valid_windows):
-        _, emb, _ = yamnet(window)
-        embeddings[i] = tf.reduce_mean(emb, axis=0).numpy()
-
-    probs = head.predict(embeddings, verbose=0)   # (num_windows, num_classes)
-    return probs.mean(axis=0)
+    if not votes:
+        return 0
+    return max(set(votes), key=votes.count)
 
 
 def main() -> None:
     """Entry point: evaluate on test_holdout/ and save classification report."""
-    print("BirdSense Evaluator")
-    print()
+    print("BirdSense Evaluator\n")
 
-    class_names, label_to_idx = load_label_map(CHECKPOINT_DIR)
-    num_classes = len(class_names)
+    label_map_path = CHECKPOINT_DIR / "label_map.json"
+    class_names, label_to_idx = load_label_map(label_map_path)
     idx_to_label = {v: k for k, v in label_to_idx.items()}
+    num_classes = len(class_names)
     print(f"Classes: {num_classes}")
 
-    # Load trained head
-    ckpt_path = CHECKPOINT_DIR / "best_head.keras"
-    if not ckpt_path.exists():
-        sys.exit(f"[ERROR] {ckpt_path} not found. Run train.py first.")
-    print(f"Loading head: {ckpt_path}")
-    head = tf.keras.models.load_model(str(ckpt_path))
-
-    # Load YAMNet
-    print("Loading YAMNet...")
-    yamnet = hub.load(YAMNET_URL)
+    model_path = CHECKPOINT_DIR / "best_model.keras"
+    if not model_path.exists():
+        sys.exit(f"[ERROR] {model_path} not found. Run train.py first.")
+    print(f"Loading model: {model_path}")
+    model = tf.keras.models.load_model(str(model_path))
 
     if not HOLDOUT_DIR.exists():
         sys.exit(f"[ERROR] {HOLDOUT_DIR} does not exist. Run split_holdout.py first.")
 
-    species_dirs = [d for d in sorted(HOLDOUT_DIR.iterdir()) if d.is_dir()]
-    total = sum(len(list(d.glob("*.mp3"))) for d in species_dirs)
+    holdout_files: list[Path] = []
+    y_true: list[int] = []
+    for species in class_names:
+        species_dir = HOLDOUT_DIR / species
+        if not species_dir.exists():
+            continue
+        for mp3 in sorted(species_dir.glob("*.mp3")):
+            holdout_files.append(mp3)
+            y_true.append(label_to_idx[species])
+
+    total = len(holdout_files)
     print(f"Holdout files: {total}\n")
 
-    y_true: list[int] = []
     y_pred: list[int] = []
-    done = 0
+    for i, mp3 in enumerate(holdout_files):
+        if i % 20 == 0:
+            print(f"  {i}/{total}", end="\r", flush=True)
+        y_pred.append(predict_file(model, mp3, num_classes))
+    print(f"  {total}/{total}\n")
 
-    for species_dir in species_dirs:
-        name = species_dir.name
-        if name not in label_to_idx:
-            print(f"[SKIP] {name} not in label map")
-            continue
-        true_idx = label_to_idx[name]
-        for mp3 in sorted(species_dir.glob("*.mp3")):
-            probs = predict_file(mp3, yamnet, head, num_classes)
-            y_true.append(true_idx)
-            y_pred.append(int(np.argmax(probs)))
-            done += 1
-            print(f"  {done}/{total}", end="\r", flush=True)
-
-    print(f"  {done}/{total}\n")
-
-    # Classification report
     target_names = [idx_to_label.get(i, f"class_{i}") for i in range(num_classes)]
-    report = classification_report(y_true, y_pred, target_names=target_names, digits=3)
-    macro_f1 = f1_score(y_true, y_pred, average="macro")
-
-    print("=" * 70)
-    print("Classification Report — Held-out Test Set")
-    print("=" * 70)
-    print(report)
-    print(f"Macro F1 : {macro_f1:.4f}")
-    print(f"Target   : {TARGET_F1}")
-
-    gate = "PASS" if macro_f1 >= TARGET_F1 else "FAIL"
-    if gate == "PASS":
-        print(f"\n[{gate}] F1 {macro_f1:.4f} >= {TARGET_F1} — safe to run export.py.")
-    else:
-        print(
-            f"\n[{gate}] F1 {macro_f1:.4f} < {TARGET_F1} — do not export. "
-            "Consider: more training data, data augmentation, or unfreezing YAMNet layers."
-        )
-
-    # Save report (export.py reads this for the gate check)
-    report_path = CHECKPOINT_DIR / "eval_report.txt"
-    report_path.write_text(
-        report
-        + f"\nMacro F1 : {macro_f1:.4f}\n"
-        + f"Target   : {TARGET_F1}\n"
-        + f"{gate}\n"
+    report = classification_report(
+        y_true, y_pred,
+        labels=list(range(num_classes)),
+        target_names=target_names,
+        digits=3,
+        zero_division=0,
     )
+    macro_f1 = f1_score(y_true, y_pred, average="macro", zero_division=0)
+
+    separator = "=" * 70
+    gate = "PASS" if macro_f1 >= TARGET_F1 else "FAIL"
+    gate_msg = (
+        f"[{gate}] F1 {macro_f1:.4f} >= {TARGET_F1} — safe to run export.py."
+        if gate == "PASS"
+        else (
+            f"[{gate}] F1 {macro_f1:.4f} < {TARGET_F1} — do not export. "
+            "Consider: more training data, data augmentation, or unfreezing more layers."
+        )
+    )
+
+    report_text = "\n".join([
+        separator,
+        "Classification Report — Held-out Test Set",
+        separator,
+        report,
+        f"Macro F1 : {macro_f1:.4f}",
+        f"Target   : {TARGET_F1}",
+        "",
+        gate_msg,
+    ])
+
+    print(report_text)
+
+    report_path = CHECKPOINT_DIR / "eval_report.txt"
+    report_path.write_text(report_text, encoding="utf-8")
     print(f"\nReport saved: {report_path}")
 
 
