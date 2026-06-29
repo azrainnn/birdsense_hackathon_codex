@@ -1,4 +1,4 @@
-"""Shared constants for the BirdSense training pipeline."""
+##Shared constants for the BirdSense training pipeline.
 
 SAMPLE_RATE: int = 16000          # Hz — all audio resampled to this
 DURATION: int = 5                 # seconds — fixed clip length for model input

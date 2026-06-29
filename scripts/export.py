@@ -19,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
+# pyrefly: ignore [missing-import]
 import tensorflow_hub as hub
 
 sys.path.insert(0, str(Path(__file__).parent))
