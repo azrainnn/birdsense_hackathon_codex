@@ -30,9 +30,12 @@ species_selector.py   →   species_list.csv   (all eligible species)
                                           (5s windows, 16 kHz, noise-gated)
                                   │
                                   ▼
-                    train.py        →   models/checkpoints/best_head.keras
+                    extract_embeddings.py  →  models/checkpoints/embeddings_train.npz
+                                                (frozen BirdNET, 1024-d per clip)
+                                  │
+                                  ▼
+                    train.py        →   models/checkpoints/best_model.keras
                                         models/checkpoints/label_map.json
-                                        models/embeddings_cache/*.npy
                                   │
                                   ▼
                     evaluate.py     →   models/checkpoints/eval_report.txt
@@ -250,11 +253,42 @@ XC123456_02.wav   ← window 2
 
 ---
 
+## `scripts/extract_embeddings.py`
+
+**Purpose:** Uses pretrained BirdNET (via `birdnetlib`) as a frozen feature extractor. Runs every processed WAV clip through BirdNET and caches a 1024-d embedding per clip (BirdNET's second-to-last layer, averaged across internal 3-second windows if a clip yields more than one). This is the slow step — a forward pass per clip — so the result is cached to disk and `train.py` never re-runs it.
+
+**Run after `preprocess.py`, before `train.py`:**
+```bash
+python scripts/extract_embeddings.py
+```
+
+**Inputs / Outputs:**
+
+| | Path |
+|---|---|
+| Input | `species_selected.csv`, `dataset/processed/<species>/*.wav` |
+| Output (cache) | `models/checkpoints/embeddings_train.npz` (`X` float32 `(N,1024)`, `y` int32 `(N,)`, `class_names`) |
+
+**Functions:**
+
+| Function | What it does |
+|---|---|
+| `load_species_list(path)` | Loads `species_selected.csv` |
+| `collect_files(species_list)` | Scans `dataset/processed/` and returns `(file_paths, labels, class_names)` |
+| `embed_file(analyzer, path)` | Runs BirdNET on one WAV clip, averages across returned windows to a `(1024,)` vector |
+| `main()` | Entry point — embeds every clip and writes `embeddings_train.npz` |
+
+**Notes:**
+- BirdNET resamples internally to 48 kHz regardless of the source file's rate; note that our clips were already downsampled to 16 kHz in `preprocess.py`, so any content above 8 kHz is permanently unavailable to BirdNET here.
+- Clips that fail extraction are skipped (logged, not fatal).
+
+---
+
 ## `scripts/train.py`
 
-**Purpose:** Fine-tunes a bird species classifier on top of frozen YAMNet embeddings. Extracts and caches 1024-d mean-pooled embeddings for all processed WAV clips, then trains a two-layer Dense head with class weighting and early stopping.
+**Purpose:** Trains a small Dense classifier head on top of cached, frozen BirdNET embeddings. BirdNET itself is never fine-tuned — only the head (Dropout → Dense(256) → Dropout → Dense(num_classes, softmax)) is trained, so this runs in seconds/epoch even on CPU.
 
-**Run after `preprocess.py`:**
+**Run after `extract_embeddings.py`:**
 ```bash
 python scripts/train.py
 ```
@@ -263,45 +297,41 @@ python scripts/train.py
 
 | | Path |
 |---|---|
-| Input | `species_selected.csv`, `dataset/processed/<species>/*.wav` |
-| Output (model) | `models/checkpoints/best_head.keras` |
+| Input | `models/checkpoints/embeddings_train.npz` |
+| Output (model) | `models/checkpoints/best_model.keras` |
 | Output (labels) | `models/checkpoints/label_map.json` |
-| Output (cache) | `models/embeddings_cache/yamnet_embeddings_<N>.npy` |
 
 **Key constants (top of file):**
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `YAMNET_URL` | TF Hub URL | YAMNet model source |
-| `BATCH_SIZE` | `64` | Training batch size |
-| `EPOCHS` | `30` | Maximum training epochs |
-| `LEARNING_RATE` | `1e-3` | Adam initial learning rate |
+| `EMBEDDING_DIM` | `1024` | BirdNET embedding size |
+| `BATCH_SIZE` | `32` | Training batch size |
+| `EPOCHS` | `60` | Maximum training epochs |
+| `LEARNING_RATE` | `1e-3` | Adam learning rate |
 | `VAL_FRACTION` | `0.18` | Fraction of clips held for validation |
-| `DROPOUT_RATE` | `0.3` | Dropout applied after each Dense layer |
-| `EMBEDDING_DIM` | `1024` | YAMNet output embedding size |
-| `PATIENCE_STOP` | `8` | EarlyStopping patience (epochs) |
+| `DROPOUT_RATE` | `0.4` | Dropout applied after each Dense layer |
+| `PATIENCE_STOP` | `10` | EarlyStopping patience (epochs) |
 | `PATIENCE_LR` | `4` | ReduceLROnPlateau patience (epochs) |
 
 **Functions:**
 
 | Function | What it does |
 |---|---|
-| `load_species_list(path)` | Loads `species_selected.csv` |
-| `collect_files(species_list)` | Scans `dataset/processed/` and returns `(file_paths, labels, class_names)` |
-| `extract_embeddings(yamnet, file_paths, cache_dir)` | Runs YAMNet on each WAV, mean-pools frame embeddings to `(1024,)`; caches result to `.npy` |
-| `build_head(num_classes)` | Returns compiled Keras Sequential: Input(1024) → Dense(256) → Dropout → Dense(128) → Dropout → Dense(num_classes, softmax) |
-| `main()` | Entry point — orchestrates the full training pipeline |
+| `load_embeddings(path)` | Loads `embeddings_train.npz` → `(X, y, class_names)` |
+| `build_model(num_classes)` | Returns uncompiled Keras model: Input(1024) → Dropout → Dense(256, relu) → Dropout → Dense(num_classes, softmax) |
+| `make_callbacks(ckpt_path)` | ModelCheckpoint / EarlyStopping / ReduceLROnPlateau / TensorBoard |
+| `main()` | Entry point — orchestrates the full training run |
 
 **Notes:**
-- Embedding extraction is cached; re-runs load from disk and skip YAMNet inference.
-- Class weights are computed automatically to handle species imbalance.
+- Class weights are computed automatically (`sklearn.compute_class_weight`) to handle species imbalance.
 - Label order in `label_map.json` defines the class index used by `labels.txt`.
 
 ---
 
 ## `scripts/evaluate.py`
 
-**Purpose:** Evaluates the trained classifier on the held-out test set (`dataset/test_holdout/`). Applies the same windowing and noise-gate pipeline as `preprocess.py` to holdout MP3s, extracts YAMNet embeddings, and reports per-species precision/recall/F1 plus macro-F1. Writes `eval_report.txt` which is the export gate for `export.py`.
+**Purpose:** Evaluates the trained classifier head on the held-out test set (`dataset/test_holdout/`). Extracts a BirdNET embedding per internal 3-second window for each holdout MP3, classifies each window, and aggregates predictions per file via majority vote. Reports per-species precision/recall/F1 plus macro-F1. Writes `eval_report.txt` which is the export gate for `export.py`.
 
 **Run after `train.py`:**
 ```bash
@@ -312,29 +342,27 @@ python scripts/evaluate.py
 
 | | Path |
 |---|---|
-| Input | `models/checkpoints/best_head.keras`, `models/checkpoints/label_map.json`, `dataset/test_holdout/<species>/*.mp3` |
-| Output | `models/checkpoints/eval_report.txt` (classification report + `PASS` or `FAIL`) |
+| Input | `models/checkpoints/best_model.keras`, `models/checkpoints/label_map.json`, `dataset/test_holdout/<species>/*.mp3` |
+| Output | `models/checkpoints/eval_report.txt` (classification report + `[PASS]` or `[FAIL]`) |
 
 **Functions:**
 
 | Function | What it does |
 |---|---|
-| `load_label_map(checkpoint_dir)` | Loads `label_map.json` written by `train.py` |
-| `extract_windows(audio)` | Same windowing logic as `preprocess.py` |
-| `predict_file(path, yamnet, head, num_classes)` | Loads an MP3, windows it, drops silent windows, extracts embeddings, returns mean softmax probability vector |
+| `load_label_map(path)` | Loads `label_map.json` written by `train.py` |
+| `predict_file(model, analyzer, mp3_path)` | Extracts BirdNET embeddings per window for one MP3, classifies each, returns the majority-vote class |
 | `main()` | Entry point — evaluates all holdout files and prints/saves the classification report |
 
 **Notes:**
-- Uses `librosa` to load MP3 holdout files (same as training preprocessing).
-- File-level prediction = mean of window-level softmax probabilities.
-- Silent windows (RMS < `SILENCE_THRESHOLD`) are excluded from prediction.
-- `eval_report.txt` ends with `PASS` or `FAIL` — `export.py` checks this line.
+- BirdNET's own internal windowing/resampling (3s @ 48kHz) replaces the manual windowing/noise-gate logic previously done by hand.
+- File-level prediction = majority vote across window-level argmax predictions.
+- `eval_report.txt` ends with `[PASS]` or `[FAIL]` — `export.py` checks this line.
 
 ---
 
 ## `scripts/export.py`
 
-**Purpose:** Combines the trained Dense head with the frozen YAMNet backbone into a single `tf.Module`, converts it to TFLite (float16 quantisation), and saves `model.tflite` and `labels.txt`. Blocked by the export gate — exits with an error if `eval_report.txt` does not contain `PASS`.
+**Purpose:** Loads `best_model.keras` (the Dense classifier head) and converts it to TFLite (float16 quantisation). Model-agnostic — works the same regardless of what architecture produced `best_model.keras`. Blocked by the export gate — exits with an error if `eval_report.txt` does not contain `[PASS]`.
 
 **Run after `evaluate.py` reports PASS:**
 ```bash
@@ -345,20 +373,17 @@ python scripts/export.py
 
 | | Path |
 |---|---|
-| Input | `models/checkpoints/best_head.keras`, `models/checkpoints/label_map.json`, `models/checkpoints/eval_report.txt` |
+| Input | `models/checkpoints/best_model.keras`, `models/checkpoints/label_map.json`, `models/checkpoints/eval_report.txt` |
 | Output | `models/export/model.tflite`, `models/export/labels.txt` |
 
-**Classes / Functions:**
+**Functions:**
 
-| Name | What it does |
+| Function | What it does |
 |---|---|
-| `BirdClassifier(tf.Module)` | Combined inference module: `predict(waveform)` → `{"class_probs": (num_classes,)}` |
-| `BirdClassifier.predict(waveform)` | `@tf.function` with fixed input signature `[WAVEFORM_LENGTH]` float32 — runs YAMNet, mean-pools embeddings, returns softmax probs |
-| `load_label_map(checkpoint_dir)` | Loads `label_map.json` |
-| `main()` | Gate check → load models → trace graph → save SavedModel → convert to TFLite → write outputs |
+| `check_eval_gate(report_path)` | Exits unless `eval_report.txt` contains `[PASS]` |
+| `load_class_names(label_map_path)` | Loads ordered class names from `label_map.json` |
+| `main()` | Gate check → load Keras model → convert to TFLite (float16) → write `model.tflite` and `labels.txt` |
 
 **Notes:**
-- TFLite model input: float32 waveform of length `SAMPLE_RATE * DURATION` (80,000 samples).
-- TFLite model output: `class_probs` float32 tensor of shape `(num_classes,)`.
-- `labels.txt` line index matches the class index in `class_probs`.
-- The Flask backend (`backend/inference.py`) loads this TFLite model at startup.
+- The exported TFLite model takes a 1024-d BirdNET embedding as input, not raw audio — the Flask backend must run BirdNET embedding extraction itself before calling this model (not yet implemented; see Phase 1 checklist).
+- `labels.txt` line index matches the class index in the model's softmax output.

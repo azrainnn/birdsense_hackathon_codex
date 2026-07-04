@@ -9,9 +9,12 @@ requests>=2.31
 librosa>=0.10
 soundfile>=0.12
 
-# Deep learning — YAMNet fine-tuning and TFLite export
+# Pretrained bird-call embeddings (BirdNET) — used to extract fixed 1024-d
+# feature vectors; we train only a small Dense head on top, no fine-tuning
+birdnetlib>=0.18
+
+# Deep learning — classifier head training and TFLite export
 tensorflow>=2.21
-tensorflow-hub>=0.16
 
 # Metrics
 scikit-learn>=1.4

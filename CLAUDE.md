@@ -150,10 +150,10 @@ SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below
 
 ## Model Rules
 
-1. **Architecture:** Fine-tuned **YAMNet** — a CNN pre-trained on AudioSet that already understands general audio features. Freeze the CNN backbone; replace and train only the final classification head for the Bornean species set.
-2. **Input:** mel-spectrogram of shape `(128, 313)` — 128 mel bins × 313 time frames for a 5-second clip at 16 kHz with the constants defined above.
-3. **Loss:** `CrossEntropyLoss` with label smoothing = 0.1.
-4. **Unfreezing:** only unfreeze the backbone if val-F1 plateaus below `TARGET_F1` after 20 epochs. Document the decision in the commit message.
+1. **Architecture:** Frozen pretrained **BirdNET** (via `birdnetlib`) as a feature extractor — extract a 1024-d embedding per clip (`scripts/extract_embeddings.py`), then train only a small Dense classification head on top (`scripts/train.py`). BirdNET itself is never fine-tuned.
+2. **Input:** cached 1024-d BirdNET embedding vector per clip (`models/checkpoints/embeddings_train.npz`), not a raw spectrogram.
+3. **Loss:** `sparse_categorical_crossentropy`.
+4. **Unfreezing:** not applicable — BirdNET stays frozen; only the Dense head is trained. (Earlier iterations tried YAMNet-frozen and end-to-end EfficientNetB0 fine-tuning; both were abandoned — EfficientNetB0 in particular failed because ImageNet-style vision transfer learning doesn't transfer well to spectrogram "images," and hit a separate `[0,255]`-vs-`[0,1]` input-scaling bug that collapsed the model to predicting one class.)
 5. **Export gate:** run `evaluate.py` on the held-out test set. Only call `export.py` if macro-F1 ≥ `TARGET_F1`. Commit the evaluation report alongside the exported model.
 6. **Export format:** `.tflite` (INT8 quantised where possible). Save `models/export/model.tflite` and `models/export/labels.txt` (one species per line, matching class index order).
 7. **Field evaluation:** test at simulated SNR levels — 20 dB (quiet), 10 dB (moderate), 5 dB (loud background). Report accuracy and F1 per noise level. Target: > 80% F1 at 20 dB, > 65% F1 at 10 dB.
@@ -162,8 +162,8 @@ SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below
 
 ## Flask Backend Rules
 
-- `backend/preprocessing.py` contains the audio → mel-spectrogram function. It has **no Flask imports** — it must be callable from the RPi in Phase 2 without modification.
-- `backend/inference.py` loads the `.tflite` model at startup and exposes a single `predict(spectrogram) → (species, confidence)` function.
+- `backend/preprocessing.py` contains the audio → BirdNET embedding function. It has **no Flask imports** — it must be callable from the RPi in Phase 2 without modification.
+- `backend/inference.py` loads the `.tflite` classifier head at startup and exposes a single `predict(embedding) → (species, confidence)` function.
 - `backend/app.py` wires these together. The `/predict` route must not contain any ML logic itself.
 - API response envelope:
   ```json
