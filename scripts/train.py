@@ -130,7 +130,7 @@ def _load_sample(path_bytes: bytes, label: int) -> tuple[np.ndarray, int]:
     Returns:
         Tuple of (spectrogram array, label).
     """
-    return wav_to_spectrogram(path_bytes.decode()), int(label)
+    return wav_to_spectrogram(path_bytes.numpy().decode()), int(label)
 
 
 def make_dataset(
