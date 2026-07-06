@@ -94,3 +94,8 @@ Thumbs.db
 
 # Claude Code settings (keep project-level, ignore local overrides)
 .claude/settings.local.json
+
+# Flask backend runtime artifacts (uploaded audio, generated spectrograms, DB)
+backend/birdsense.db
+backend/uploads/
+backend/spectrograms/

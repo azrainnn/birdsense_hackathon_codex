@@ -1,0 +1,17 @@
+# Flask backend dependencies (regular server, NOT Raspberry Pi)
+# Install with: pip install -r backend/requirements.txt
+
+flask>=3.0
+
+# Audio & BirdNET embedding extraction
+librosa>=0.10
+soundfile>=0.12
+resampy>=0.4
+birdnetlib>=0.18
+
+# Classifier head inference (falls back to full tensorflow if
+# tflite-runtime is unavailable — see inference.py)
+tensorflow>=2.21
+
+# Spectrogram rendering for the results dashboard
+matplotlib>=3.5
