@@ -22,10 +22,26 @@ import numpy as np
 import tensorflow as tf
 from birdnetlib import Recording
 from birdnetlib.analyzer import Analyzer
+import birdnetlib.analyzer as _birdnetlib_analyzer
 from sklearn.metrics import classification_report, f1_score
 
 sys.path.insert(0, str(Path(__file__).parent))
 from constants import TARGET_F1
+
+# TensorFlow >= 2.17 prunes the intermediate embedding tensor unless all
+# tensors are explicitly preserved, which breaks birdnetlib's embedding
+# extraction with "Tensor data is null" on every call.
+# See: https://github.com/joeweiss/birdnetlib/issues/125
+_original_tflite_interpreter = _birdnetlib_analyzer.tflite.Interpreter
+
+
+def _patched_tflite_interpreter(*args, **kwargs):
+    """Force experimental_preserve_all_tensors=True on every TFLite Interpreter."""
+    kwargs.setdefault("experimental_preserve_all_tensors", True)
+    return _original_tflite_interpreter(*args, **kwargs)
+
+
+_birdnetlib_analyzer.tflite.Interpreter = _patched_tflite_interpreter
 
 _ROOT: Path = Path(__file__).parent.parent
 HOLDOUT_DIR: Path = _ROOT / "dataset" / "test_holdout"
@@ -48,7 +64,7 @@ def load_label_map(path: Path) -> tuple[list[str], dict[str, int]]:
     return data["class_names"], data["label_to_idx"]
 
 
-def predict_file(model: tf.keras.Model, analyzer: Analyzer, mp3_path: Path) -> int:
+def predict_file(model: tf.keras.Model, analyzer: Analyzer, mp3_path: Path) -> int | None:
     """Predict species for one MP3 via majority vote over BirdNET windows.
 
     Args:
@@ -57,14 +73,16 @@ def predict_file(model: tf.keras.Model, analyzer: Analyzer, mp3_path: Path) -> i
         mp3_path: Path to holdout .mp3 file.
 
     Returns:
-        Predicted integer class index, or 0 if extraction yielded nothing.
+        Predicted integer class index, 0 if extraction yielded no windows,
+        or None if BirdNET extraction raised (signals a possibly corrupted
+        shared interpreter — caller should retry with a fresh Analyzer).
     """
     try:
         recording = Recording(analyzer, str(mp3_path))
         recording.extract_embeddings()
     except Exception as exc:
         print(f"  [FAIL] {mp3_path.name}: {exc}")
-        return 0
+        return None
 
     if not recording.embeddings:
         return 0
@@ -110,10 +128,26 @@ def main() -> None:
     print(f"Holdout files: {total}\n")
 
     y_pred: list[int] = []
+    consecutive_failures = 0
     for i, mp3 in enumerate(holdout_files):
         if i % 20 == 0:
             print(f"  {i}/{total}", end="\r", flush=True)
-        y_pred.append(predict_file(model, analyzer, mp3))
+        pred = predict_file(model, analyzer, mp3)
+        if pred is None:
+            consecutive_failures += 1
+            # 3+ failures in a row means the shared TFLite interpreter has
+            # likely landed in a corrupted state (not 3 genuinely bad clips) —
+            # reinitialize the analyzer and retry this file once.
+            if consecutive_failures >= 3:
+                print("\n  [RECOVER] Reinitializing BirdNET analyzer after repeated failures...")
+                analyzer = Analyzer()
+                pred = predict_file(model, analyzer, mp3)
+                consecutive_failures = 0
+            if pred is None:
+                pred = 0
+        else:
+            consecutive_failures = 0
+        y_pred.append(pred)
     print(f"  {total}/{total}\n")
 
     target_names = [idx_to_label.get(i, f"class_{i}") for i in range(num_classes)]

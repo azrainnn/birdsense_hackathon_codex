@@ -1,0 +1,36 @@
+{
+  "class_names": [
+    "bornean_black_magpie",
+    "white-crowned_shama",
+    "bold-striped_tit-babbler",
+    "blue-eared_barbet",
+    "black-crowned_pitta",
+    "golden-naped_barbet",
+    "bornean_treepie",
+    "blue-headed_pitta",
+    "greater_racket-tailed_drongo",
+    "rhinoceros_hornbill",
+    "rufous-crowned_babbler",
+    "white-chested_babbler",
+    "bornean_banded_pitta",
+    "bornean_ground_cuckoo",
+    "bornean_bristlehead"
+  ],
+  "label_to_idx": {
+    "bornean_black_magpie": 0,
+    "white-crowned_shama": 1,
+    "bold-striped_tit-babbler": 2,
+    "blue-eared_barbet": 3,
+    "black-crowned_pitta": 4,
+    "golden-naped_barbet": 5,
+    "bornean_treepie": 6,
+    "blue-headed_pitta": 7,
+    "greater_racket-tailed_drongo": 8,
+    "rhinoceros_hornbill": 9,
+    "rufous-crowned_babbler": 10,
+    "white-chested_babbler": 11,
+    "bornean_banded_pitta": 12,
+    "bornean_ground_cuckoo": 13,
+    "bornean_bristlehead": 14
+  }
+}

@@ -77,6 +77,12 @@ outputs/
 results/
 checkpoints/
 
+# BirdSense export artifacts must be committed (see CLAUDE.md export gate)
+!models/export/*.tflite
+!models/checkpoints/
+models/checkpoints/*
+!models/checkpoints/eval_report.txt
+
 # IDE & editor
 .vscode/
 .idea/

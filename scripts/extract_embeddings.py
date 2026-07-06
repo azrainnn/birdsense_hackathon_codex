@@ -17,8 +17,24 @@ from pathlib import Path
 import numpy as np
 from birdnetlib import Recording
 from birdnetlib.analyzer import Analyzer
+import birdnetlib.analyzer as _birdnetlib_analyzer
 
 sys.path.insert(0, str(Path(__file__).parent))
+
+# TensorFlow >= 2.17 prunes the intermediate embedding tensor unless all
+# tensors are explicitly preserved, which breaks birdnetlib's embedding
+# extraction with "Tensor data is null" on every call.
+# See: https://github.com/joeweiss/birdnetlib/issues/125
+_original_tflite_interpreter = _birdnetlib_analyzer.tflite.Interpreter
+
+
+def _patched_tflite_interpreter(*args, **kwargs):
+    """Force experimental_preserve_all_tensors=True on every TFLite Interpreter."""
+    kwargs.setdefault("experimental_preserve_all_tensors", True)
+    return _original_tflite_interpreter(*args, **kwargs)
+
+
+_birdnetlib_analyzer.tflite.Interpreter = _patched_tflite_interpreter
 
 _ROOT: Path = Path(__file__).parent.parent
 PROCESSED_DIR: Path = _ROOT / "dataset" / "processed"
@@ -112,12 +128,25 @@ def main() -> None:
 
     embeddings: list[np.ndarray] = []
     labels: list[int] = []
+    consecutive_failures = 0
     for i, (path, label) in enumerate(zip(file_paths, int_labels)):
         if i % 50 == 0:
             print(f"  {i}/{total}", end="\r", flush=True)
         vec = embed_file(analyzer, path)
         if vec is None:
-            continue
+            consecutive_failures += 1
+            # 3+ failures in a row means the shared TFLite interpreter has
+            # likely landed in a corrupted state (not 3 genuinely bad clips) —
+            # reinitialize the analyzer and retry this file once.
+            if consecutive_failures >= 3:
+                print("\n  [RECOVER] Reinitializing BirdNET analyzer after repeated failures...")
+                analyzer = Analyzer()
+                vec = embed_file(analyzer, path)
+                consecutive_failures = 0
+            if vec is None:
+                continue
+        else:
+            consecutive_failures = 0
         embeddings.append(vec)
         labels.append(label)
     print(f"  {total}/{total}\n")

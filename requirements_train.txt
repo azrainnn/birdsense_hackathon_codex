@@ -8,6 +8,7 @@ requests>=2.31
 # Audio & feature extraction
 librosa>=0.10
 soundfile>=0.12
+resampy>=0.4
 
 # Pretrained bird-call embeddings (BirdNET) — used to extract fixed 1024-d
 # feature vectors; we train only a small Dense head on top, no fine-tuning

@@ -1,0 +1,29 @@
+======================================================================
+Classification Report — Held-out Test Set
+======================================================================
+                              precision    recall  f1-score   support
+
+        bornean_black_magpie      0.800     0.923     0.857        13
+         white-crowned_shama      0.833     0.909     0.870        11
+    bold-striped_tit-babbler      1.000     0.727     0.842        11
+           blue-eared_barbet      1.000     0.964     0.982        28
+         black-crowned_pitta      1.000     0.889     0.941         9
+         golden-naped_barbet      0.889     1.000     0.941         8
+             bornean_treepie      0.833     0.714     0.769         7
+           blue-headed_pitta      1.000     0.833     0.909         6
+greater_racket-tailed_drongo      0.930     0.981     0.955        54
+         rhinoceros_hornbill      0.900     0.900     0.900        10
+      rufous-crowned_babbler      0.833     1.000     0.909        15
+       white-chested_babbler      0.944     0.895     0.919        19
+        bornean_banded_pitta      1.000     0.800     0.889         5
+       bornean_ground_cuckoo      1.000     1.000     1.000         6
+         bornean_bristlehead      1.000     0.800     0.889         5
+
+                    accuracy                          0.923       207
+                   macro avg      0.931     0.889     0.905       207
+                weighted avg      0.928     0.923     0.922       207
+
+Macro F1 : 0.9048
+Target   : 0.8
+
+[PASS] F1 0.9048 >= 0.8 — safe to run export.py.
