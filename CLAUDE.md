@@ -204,7 +204,7 @@ SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below
 
 | Phase | Description | Status |
 |---|---|---|
-| **Phase 1** | Data pipeline → YAMNet fine-tuning → Flask API → React dashboard | 🟡 In progress |
+| **Phase 1** | Data pipeline → frozen BirdNET embeddings + Dense head → Flask API → React dashboard | 🟡 In progress |
 | **Phase 2** | Optional — Raspberry Pi real-time inference, on-device detection loop | ⬜ Not started |
 
 ### Phase 1 Checklist
@@ -213,21 +213,21 @@ SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below
 - [ ] Species list expanded to 25–30 species — `NUM_SPECIES` set in `constants.py`
 - [x] Xeno-canto download script complete (`scripts/downloader.py`)
 - [ ] ≥ 20 Grade A/B recordings per species confirmed for all 25–30 species
-- [ ] `split_holdout.py` run — 15% test files moved to `dataset/test_holdout/`
-- [ ] `preprocess.py` run — processed clips in `dataset/processed/`
+- [x] `split_holdout.py` run — 15% test files moved to `dataset/test_holdout/`
+- [x] `preprocess.py` run — processed clips in `dataset/processed/`
 
 **Model**
-- [ ] Training script complete (`scripts/train.py`) — YAMNet fine-tuning
-- [ ] Val-F1 ≥ 0.80 achieved
-- [ ] Evaluation report generated (`scripts/evaluate.py`) — including SNR field test
-- [ ] Model exported to `.tflite` (`scripts/export.py`)
-- [ ] `models/export/model.tflite` and `labels.txt` committed
+- [x] Training script complete (`scripts/train.py`) — frozen BirdNET embeddings + Dense head
+- [x] Val-F1 ≥ 0.80 achieved (macro-F1 = 0.90 on held-out test set, 15 species)
+- [x] Evaluation report generated (`scripts/evaluate.py`) — SNR field test still outstanding
+- [x] Model exported to `.tflite` (`scripts/export.py`)
+- [x] `models/export/model.tflite` and `labels.txt` committed
 
 **Web Application**
-- [ ] Flask backend complete (`backend/app.py`, `inference.py`, `preprocessing.py`)
+- [x] Flask backend complete (`backend/app.py`, `inference.py`, `preprocessing.py`) — verified end-to-end against held-out audio
 - [ ] React frontend complete — upload form + results dashboard
-- [ ] SQLite schema set up (`backend/birdsense.db`)
-- [ ] End-to-end demo working (upload audio → species + confidence + spectrogram)
+- [x] SQLite schema set up (`backend/birdsense.db`)
+- [ ] End-to-end demo working (upload audio → species + confidence + spectrogram) — backend verified via curl; full demo pending React frontend
 
 ---
 
