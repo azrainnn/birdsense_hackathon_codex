@@ -74,7 +74,7 @@ birdsense/
 | Purpose | Library / Framework |
 |---|---|
 | Backend API | Flask |
-| Frontend | React |
+| Frontend | React + TypeScript (Vite), Tailwind CSS, react-router-dom |
 | Database | SQLite (stdlib `sqlite3`) |
 | On-server inference | TFLite runtime |
 
@@ -163,14 +163,20 @@ SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below
 ## Flask Backend Rules
 
 - `backend/preprocessing.py` contains the audio → BirdNET embedding function. It has **no Flask imports** — it must be callable from the RPi in Phase 2 without modification.
-- `backend/inference.py` loads the `.tflite` classifier head at startup and exposes a single `predict(embedding) → (species, confidence)` function.
-- `backend/app.py` wires these together. The `/predict` route must not contain any ML logic itself.
-- API response envelope:
+- `backend/inference.py` loads the `.tflite` classifier head at startup and exposes a single `predict(embeddings) → dict` function (`species`, `confidence`, `top_predictions`), soft-voting (mean softmax probability across window embeddings) rather than majority vote.
+- `backend/app.py` wires these together. The `/predict` route must not contain any ML logic itself. It also exposes `GET /species` (metadata from `species_selected.csv`, used by the React "About species" page) and `GET /uploads/<filename>` (serves the original uploaded audio back for playback).
+- API response envelope (`POST /predict`):
   ```json
   {
-    "species": "Rhinoceros Hornbill",
+    "species": "rhinoceros_hornbill",
     "confidence": 0.92,
-    "spectrogram_url": "/spectrograms/<id>.png"
+    "spectrogram_url": "/spectrograms/<id>.png",
+    "audio_url": "/uploads/<id>.mp3",
+    "top_predictions": [
+      {"species": "rhinoceros_hornbill", "confidence": 0.92},
+      {"species": "greater_racket-tailed_drongo", "confidence": 0.05},
+      {"species": "bornean_black_magpie", "confidence": 0.02}
+    ]
   }
   ```
 - Store uploaded audio in `backend/uploads/`, generated spectrogram images in `backend/spectrograms/`, and prediction metadata in `backend/birdsense.db`.
@@ -224,10 +230,10 @@ SILENCE_THRESHOLD: float = 0.01   # RMS threshold for noise gate — clips below
 - [x] `models/export/model.tflite` and `labels.txt` committed
 
 **Web Application**
-- [x] Flask backend complete (`backend/app.py`, `inference.py`, `preprocessing.py`) — verified end-to-end against held-out audio
-- [ ] React frontend complete — upload form + results dashboard
+- [x] Flask backend complete (`backend/app.py`, `inference.py`, `preprocessing.py`) — verified end-to-end against held-out audio; extended with top-3 predictions, audio playback, and species metadata endpoints
+- [x] React frontend complete (`frontend/`, Vite + TS + Tailwind) — Identify page (upload/results), History page, About Species page
 - [x] SQLite schema set up (`backend/birdsense.db`)
-- [ ] End-to-end demo working (upload audio → species + confidence + spectrogram) — backend verified via curl; full demo pending React frontend
+- [x] End-to-end demo working (upload audio → species + confidence + spectrogram) — verified via curl through the Vite dev proxy (`/predict`, `/species`) and a production `vite build`; visual browser check not possible in this environment (no Playwright browser available) — do a manual `npm run dev` + `python backend/app.py` check before the real demo
 
 ---
 

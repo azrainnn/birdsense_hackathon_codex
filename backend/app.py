@@ -4,6 +4,7 @@ Routes only wire preprocessing.py and inference.py together — no ML logic
 belongs here (see CLAUDE.md Flask Backend Rules).
 """
 
+import csv
 import sqlite3
 import uuid
 from pathlib import Path
@@ -17,6 +18,7 @@ _ROOT: Path = Path(__file__).parent
 UPLOAD_DIR: Path = _ROOT / "uploads"
 SPECTROGRAM_DIR: Path = _ROOT / "spectrograms"
 DB_PATH: Path = _ROOT / "birdsense.db"
+SPECIES_CSV_PATH: Path = _ROOT.parent / "species_selected.csv"
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 SPECTROGRAM_DIR.mkdir(exist_ok=True)
@@ -35,6 +37,7 @@ def init_db() -> None:
                 species TEXT NOT NULL,
                 confidence REAL NOT NULL,
                 spectrogram_path TEXT NOT NULL,
+                audio_path TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
             """
@@ -53,29 +56,39 @@ def predict_route():
     audio_file = request.files["audio"]
     upload_id = str(uuid.uuid4())
     suffix = Path(audio_file.filename).suffix or ".wav"
-    audio_path = UPLOAD_DIR / f"{upload_id}{suffix}"
+    audio_filename = f"{upload_id}{suffix}"
+    audio_path = UPLOAD_DIR / audio_filename
     audio_file.save(audio_path)
 
     embeddings = preprocessing.extract_embeddings(str(audio_path))
     if not embeddings:
         return jsonify({"error": "Could not extract any audio features from this file"}), 422
 
-    species, confidence = inference.predict(embeddings)
+    result = inference.predict(embeddings)
+    species = result["species"]
+    confidence = result["confidence"]
 
-    spectrogram_path = SPECTROGRAM_DIR / f"{upload_id}.png"
+    spectrogram_filename = f"{upload_id}.png"
+    spectrogram_path = SPECTROGRAM_DIR / spectrogram_filename
     preprocessing.generate_spectrogram(str(audio_path), str(spectrogram_path))
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            "INSERT INTO predictions (id, filename, species, confidence, spectrogram_path) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (upload_id, audio_file.filename, species, confidence, f"{upload_id}.png"),
+            "INSERT INTO predictions "
+            "(id, filename, species, confidence, spectrogram_path, audio_path) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (upload_id, audio_file.filename, species, confidence, spectrogram_filename, audio_filename),
         )
 
     return jsonify({
         "species": species,
         "confidence": round(confidence, 4),
-        "spectrogram_url": f"/spectrograms/{upload_id}.png",
+        "spectrogram_url": f"/spectrograms/{spectrogram_filename}",
+        "audio_url": f"/uploads/{audio_filename}",
+        "top_predictions": [
+            {"species": p["species"], "confidence": round(p["confidence"], 4)}
+            for p in result["top_predictions"]
+        ],
     })
 
 
@@ -85,17 +98,48 @@ def serve_spectrogram(filename: str):
     return send_from_directory(SPECTROGRAM_DIR, filename)
 
 
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename: str):
+    """Serve a previously uploaded audio file for playback."""
+    return send_from_directory(UPLOAD_DIR, filename)
+
+
 @app.route("/history", methods=["GET"])
 def history_route():
     """Return past predictions, most recent first."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT id, filename, species, confidence, spectrogram_path, created_at "
+            "SELECT id, filename, species, confidence, spectrogram_path, audio_path, created_at "
             "FROM predictions ORDER BY created_at DESC LIMIT 50"
         ).fetchall()
 
-    return jsonify([dict(row) for row in rows])
+    history = []
+    for row in rows:
+        entry = dict(row)
+        entry["spectrogram_url"] = f"/spectrograms/{entry.pop('spectrogram_path')}"
+        entry["audio_url"] = f"/uploads/{entry.pop('audio_path')}"
+        history.append(entry)
+
+    return jsonify(history)
+
+
+@app.route("/species", methods=["GET"])
+def species_route():
+    """Return metadata for every species the model can recognize."""
+    with open(SPECIES_CSV_PATH, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        species = [
+            {
+                "species_name": row["species_name"],
+                "scientific_name": row["scientific_name"],
+                "recording_count": int(row["recording_count"]),
+            }
+            for row in reader
+            if row["species_name"]
+        ]
+
+    return jsonify(species)
 
 
 if __name__ == "__main__":

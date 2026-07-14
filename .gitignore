@@ -48,6 +48,8 @@ data/external/
 !species_list.csv
 !species_selected.csv
 *.json
+# Allow frontend build/tooling config (package.json, tsconfig*.json, lint config)
+!frontend/*.json
 *.xml
 *.parquet
 *.zip
