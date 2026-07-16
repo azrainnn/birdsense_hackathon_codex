@@ -39,7 +39,6 @@ export interface PredictionResult {
   audio_url: string
   top_predictions: TopPrediction[]
   window_predictions: WindowPrediction[]
-  window_predictions: WindowPrediction[]
   id?: string
   quality?: PredictionQuality
   needs_review?: boolean
