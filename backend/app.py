@@ -28,6 +28,8 @@ SPECIES_CSV_PATH: Path = _ROOT.parent / "species_selected.csv"
 ALLOWED_AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".webm"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_NOTES_LENGTH = 1_000
+HABITAT_TYPES = {"Primary forest", "Secondary forest", "Forest edge", "Riverine forest", "Gardens or settlement", "Unknown"}
+WEATHER_CONDITIONS = {"Clear", "Overcast", "Light rain", "Heavy rain", "Windy", "Unknown"}
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 SPECTROGRAM_DIR.mkdir(exist_ok=True)
@@ -89,6 +91,8 @@ def init_db() -> None:
             )
             """
         )
+        _ensure_column(conn, "observations", "habitat", "TEXT")
+        _ensure_column(conn, "observations", "weather", "TEXT")
 
 
 init_db()
@@ -360,6 +364,12 @@ def observation_route():
     if len(notes) > MAX_NOTES_LENGTH:
         return jsonify({"error": f"Notes must be {MAX_NOTES_LENGTH} characters or fewer."}), 400
     observed_at = str(payload.get("observed_at") or "").strip() or None
+    habitat = str(payload.get("habitat") or "").strip() or None
+    weather = str(payload.get("weather") or "").strip() or None
+    if habitat and habitat not in HABITAT_TYPES:
+        return jsonify({"error": "Choose one of the available habitat contexts."}), 400
+    if weather and weather not in WEATHER_CONDITIONS:
+        return jsonify({"error": "Choose one of the available weather contexts."}), 400
     try:
         confidence = float(payload["confidence"]) if payload.get("confidence") is not None else None
     except (TypeError, ValueError):
@@ -369,8 +379,8 @@ def observation_route():
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            "INSERT INTO observations (id, species, region, observed_at, notes, confidence) VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), species, region or None, observed_at, notes or None, confidence),
+            "INSERT INTO observations (id, species, region, observed_at, notes, confidence, habitat, weather) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), species, region or None, observed_at, notes or None, confidence, habitat, weather),
         )
     return jsonify({"status": "saved", "privacy": "Only a broad region was stored."}), 201
 

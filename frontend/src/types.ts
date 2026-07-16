@@ -88,6 +88,8 @@ export interface Observation {
   species: string
   region?: string
   observed_at?: string
+  habitat?: string
+  weather?: string
   notes?: string
   confidence?: number
 }

@@ -20,6 +20,12 @@ function formatDuration(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+function recordingAssessment(seconds: number) {
+  if (seconds < 3) return { label: 'Short capture', message: 'Try for at least 3 seconds of a clear call.', tone: 'text-sarawak-red bg-sarawak-red/10' }
+  if (seconds > 45) return { label: 'Long capture', message: 'A quieter 5–20 second section is often easier to assess.', tone: 'text-forest bg-leaf' }
+  return { label: 'Good length', message: 'Long enough to compare repeated call patterns.', tone: 'text-signal bg-signal/10' }
+}
+
 async function convertRecordingToWav(recording: File) {
   const context = new AudioContext()
   try {
@@ -223,7 +229,7 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
       {recordedFile && recordingPreviewUrl && !isRecording && (
         <div className="mt-4 rounded-2xl border border-sarawak-yellow/55 bg-sarawak-yellow/12 p-4" aria-live="polite">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="text-xs font-bold tracking-[0.14em] text-sarawak-red uppercase">Recording ready</p><p className="mt-1 text-sm font-semibold text-ink">{formatDuration(recordingSeconds)} captured from this device</p></div>
+            <div><p className="text-xs font-bold tracking-[0.14em] text-sarawak-red uppercase">Recording ready</p><p className="mt-1 text-sm font-semibold text-ink">{formatDuration(recordingSeconds)} captured from this device</p><span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${recordingAssessment(recordingSeconds).tone}`}>{recordingAssessment(recordingSeconds).label} · {recordingAssessment(recordingSeconds).message}</span></div>
             <audio controls src={recordingPreviewUrl} className="h-10 w-full sm:max-w-xs"><track kind="captions" /></audio>
           </div>
           <div className="mt-4 flex flex-wrap gap-3">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchAnalytics, fetchHistory } from '../api'
 import { ConfidenceBadge } from '../components/ConfidenceBadge'
 import { Icon } from '../components/Icon'
+import { SpeciesPhoto } from '../components/SpeciesPhoto'
 import type { AnalyticsSummary, HistoryEntry } from '../types'
 import { formatSpeciesName, formatTimestamp } from '../utils'
 
@@ -75,7 +76,7 @@ export function HistoryPage() {
                   {filteredEntries.map((entry) => (
                     <li key={entry.id} className="rounded-2xl border border-forest/10 bg-paper p-4 shadow-[0_8px_24px_rgb(9_29_24/4%)]">
                       <div className="flex flex-wrap items-center gap-4">
-                        <img src={entry.spectrogram_url} alt={`Spectrogram for ${formatSpeciesName(entry.species)}`} className="h-[4.25rem] w-[6.75rem] shrink-0 rounded-xl border border-forest/10 object-cover" />
+                        <div className="relative h-[4.25rem] w-[6.75rem] shrink-0 overflow-hidden rounded-xl border border-forest/10 bg-forest"><SpeciesPhoto speciesName={entry.species} className="h-full w-full" /><img src={entry.spectrogram_url} alt={`Spectrogram for ${formatSpeciesName(entry.species)}`} className="absolute right-1 bottom-1 h-7 w-12 rounded-md border border-paper/30 object-cover shadow-sm" /></div>
                         <div className="min-w-[10.5rem] flex-1">
                           <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink">{formatSpeciesName(entry.species)}</p>{entry.needs_review && <span className="rounded-full bg-sarawak-red/10 px-2 py-1 text-[10px] font-bold text-sarawak-red">Review</span>}</div>
                           <p className="mt-1 truncate text-xs text-muted">{entry.filename} · {formatTimestamp(entry.created_at)}</p>

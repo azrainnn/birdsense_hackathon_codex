@@ -6,6 +6,7 @@ import { DetectionTimeline } from './DetectionTimeline'
 import { FieldActions } from './FieldActions'
 import { Icon } from './Icon'
 import { SpeciesProfileCard } from './SpeciesProfileCard'
+import { SpeciesPhoto } from './SpeciesPhoto'
 import { SpectrogramView } from './SpectrogramView'
 import { TopPredictionsList } from './TopPredictionsList'
 import { WindowConfidenceTimeline } from './WindowConfidenceTimeline'
@@ -32,13 +33,13 @@ export function ResultsPanel({ result, profile, species, onReset }: ResultsPanel
     <div className="space-y-7">
       <section className="overflow-hidden rounded-3xl border border-forest/10 bg-paper shadow-[0_18px_60px_rgb(9_29_24/8%)]" aria-labelledby="result-title">
         <div className="relative overflow-hidden bg-ink px-6 py-7 text-paper sm:px-8 sm:py-9">
-          <div className="relative flex flex-wrap items-start justify-between gap-5">
+          <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
             <div>
               <p className="text-xs font-bold tracking-[0.15em] text-sarawak-yellow uppercase">Leading candidate</p>
               <h2 id="result-title" className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{formatSpeciesName(result.species)}</h2>
               {profile && <p className="mt-1 text-sm italic text-paper/65">{profile.scientific_name}</p>}
             </div>
-            <ConfidenceBadge confidence={result.confidence} />
+            <div className="flex items-start gap-3"><ConfidenceBadge confidence={result.confidence} />{profile && <SpeciesPhoto speciesName={result.species} scientificName={profile.scientific_name} className="h-20 w-28 rounded-2xl border border-paper/15 sm:h-24 sm:w-36" />}</div>
           </div>
         </div>
 
@@ -53,7 +54,7 @@ export function ResultsPanel({ result, profile, species, onReset }: ResultsPanel
             </div>
             <DetectionTimeline events={result.timeline ?? []} />
           </div>
-          <div className="space-y-5"><TopPredictionsList predictions={result.top_predictions} /><FieldActions result={result} profile={profile} species={species} /></div>
+          <div className="space-y-5"><TopPredictionsList predictions={result.top_predictions} species={species} /><FieldActions result={result} profile={profile} species={species} /></div>
         </div>
       </section>
       {profile ? <SpeciesProfileCard profile={profile} /> : <div className="rounded-2xl border border-forest/10 bg-paper p-5 text-sm text-muted">Loading the Sarawak field guide…</div>}

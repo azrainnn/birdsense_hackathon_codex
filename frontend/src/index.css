@@ -117,3 +117,15 @@ textarea {
     opacity: 0;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .analysis-wave-bar {
+    animation: analysis-wave 1.1s ease-in-out infinite alternate;
+    transform-origin: center;
+  }
+}
+
+@keyframes analysis-wave {
+  from { transform: scaleY(0.35); opacity: 0.45; }
+  to { transform: scaleY(1); opacity: 1; }
+}

@@ -2,6 +2,7 @@ import type { SpeciesProfile } from '../types'
 import { formatSpeciesName } from '../utils'
 import { Icon } from './Icon'
 import { SarawakRangeMap } from './SarawakRangeMap'
+import { SpeciesPhoto } from './SpeciesPhoto'
 
 interface SpeciesProfileCardProps {
   profile: SpeciesProfile
@@ -11,9 +12,9 @@ interface SpeciesProfileCardProps {
 export function SpeciesProfileCard({ profile, showMap = true }: SpeciesProfileCardProps) {
   return (
     <section className="overflow-hidden rounded-3xl border border-forest/10 bg-paper shadow-[0_16px_48px_rgb(9_29_24/7%)]" aria-labelledby={`profile-${profile.species_name}`}>
-      <div className="relative overflow-hidden bg-ink px-6 py-7 text-paper sm:px-8">
+      <div className="relative grid overflow-hidden bg-ink text-paper md:grid-cols-[1.15fr_.85fr]">
         <div className="absolute top-0 right-12 h-32 w-32 rounded-full border-[20px] border-sarawak-yellow/15" />
-        <div className="relative max-w-2xl">
+        <div className="relative px-6 py-7 sm:px-8">
           <p className="text-xs font-bold tracking-[0.16em] text-sarawak-yellow uppercase">Field guide</p>
           <h2 id={`profile-${profile.species_name}`} className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
             {formatSpeciesName(profile.species_name)}
@@ -21,6 +22,7 @@ export function SpeciesProfileCard({ profile, showMap = true }: SpeciesProfileCa
           <p className="mt-1 text-sm italic text-paper/65">{profile.scientific_name}</p>
           <p className="mt-4 max-w-xl text-sm leading-6 text-paper/85">{profile.summary}</p>
         </div>
+        <SpeciesPhoto speciesName={profile.species_name} scientificName={profile.scientific_name} priority className="min-h-52 md:min-h-full" showAttribution />
       </div>
 
       <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.05fr_.95fr]">

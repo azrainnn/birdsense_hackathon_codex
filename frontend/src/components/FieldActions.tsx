@@ -23,6 +23,8 @@ export function FieldActions({ result, profile, species }: FieldActionsProps) {
   const [observationMessage, setObservationMessage] = useState('')
   const [region, setRegion] = useState('')
   const [observedAt, setObservedAt] = useState('')
+  const [habitat, setHabitat] = useState('')
+  const [weather, setWeather] = useState('')
   const [observationNotes, setObservationNotes] = useState('')
 
   async function saveFeedback(verdict: FieldFeedback['verdict']) {
@@ -57,6 +59,8 @@ export function FieldActions({ result, profile, species }: FieldActionsProps) {
       species: result.species,
       region: region || undefined,
       observed_at: observedAt || undefined,
+      habitat: habitat || undefined,
+      weather: weather || undefined,
       notes: observationNotes || undefined,
       confidence: result.confidence,
     }
@@ -126,6 +130,20 @@ export function FieldActions({ result, profile, species }: FieldActionsProps) {
               <label className="text-xs font-semibold text-forest" htmlFor="observed-at">
                 Date and time (optional)
                 <input id="observed-at" type="datetime-local" value={observedAt} onChange={(event) => setObservedAt(event.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm font-normal text-ink" />
+              </label>
+              <label className="text-xs font-semibold text-forest" htmlFor="observation-habitat">
+                Habitat context
+                <select id="observation-habitat" value={habitat} onChange={(event) => setHabitat(event.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm font-normal text-ink">
+                  <option value="">Not specified</option>
+                  {['Primary forest', 'Secondary forest', 'Forest edge', 'Riverine forest', 'Gardens or settlement', 'Unknown'].map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-forest" htmlFor="observation-weather">
+                Weather
+                <select id="observation-weather" value={weather} onChange={(event) => setWeather(event.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm font-normal text-ink">
+                  <option value="">Not specified</option>
+                  {['Clear', 'Overcast', 'Light rain', 'Heavy rain', 'Windy', 'Unknown'].map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
               </label>
             </div>
             <label className="block text-xs font-semibold text-forest" htmlFor="observation-notes">

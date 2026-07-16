@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { fetchSpecies, fetchSpeciesProfile } from '../api'
 import { Icon } from '../components/Icon'
 import { SpeciesProfileCard } from '../components/SpeciesProfileCard'
+import { SpeciesPhoto } from '../components/SpeciesPhoto'
 import type { SpeciesInfo, SpeciesProfile } from '../types'
 import { formatSpeciesName } from '../utils'
 
@@ -14,6 +15,14 @@ export function SpeciesPage() {
   const [profile, setProfile] = useState<SpeciesProfile | undefined>()
   const [profileStatus, setProfileStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [query, setQuery] = useState('')
+  const profileRef = useRef<HTMLElement>(null)
+
+  function selectSpecies(speciesName: string) {
+    setSelectedSpecies(speciesName)
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      window.setTimeout(() => profileRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+    }
+  }
 
   useEffect(() => {
     fetchSpecies()
@@ -52,7 +61,7 @@ export function SpeciesPage() {
       </header>
 
       <div className="mt-9 grid gap-7 lg:grid-cols-[.8fr_1.2fr]">
-        <aside className="rounded-3xl border border-forest/10 bg-paper p-4 shadow-[0_12px_40px_rgb(9_29_24/5%)] lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+        <aside className="order-2 rounded-3xl border border-forest/10 bg-paper p-4 shadow-[0_12px_40px_rgb(9_29_24/5%)] lg:order-1 lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
           <div className="px-2 pb-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-semibold text-ink">Recognised species</h2>
@@ -73,9 +82,10 @@ export function SpeciesPage() {
                 const isSelected = item.species_name === selectedSpecies
                 return (
                   <li key={item.species_name}>
-                    <button type="button" onClick={() => setSelectedSpecies(item.species_name)} aria-pressed={isSelected} className={`w-full rounded-2xl p-3 text-left transition ${isSelected ? 'bg-ink text-paper shadow-md' : 'text-forest hover:bg-canvas'}`}>
-                      <span className="flex items-start justify-between gap-3">
-                        <span className="min-w-0"><span className="block truncate text-sm font-semibold">{formatSpeciesName(item.species_name)}</span><span className={`mt-0.5 block truncate text-xs italic ${isSelected ? 'text-paper/65' : 'text-muted'}`}>{item.scientific_name}</span></span>
+                    <button type="button" onClick={() => selectSpecies(item.species_name)} aria-pressed={isSelected} className={`w-full rounded-2xl p-3 text-left transition ${isSelected ? 'bg-ink text-paper shadow-md' : 'text-forest hover:bg-canvas'}`}>
+                      <span className="flex items-center justify-between gap-3">
+                        <SpeciesPhoto speciesName={item.species_name} scientificName={item.scientific_name} className="h-11 w-11 shrink-0 rounded-xl" />
+                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{formatSpeciesName(item.species_name)}</span><span className={`mt-0.5 block truncate text-xs italic ${isSelected ? 'text-paper/65' : 'text-muted'}`}>{item.scientific_name}</span></span>
                         <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${isSelected ? 'bg-sarawak-yellow text-ink' : 'bg-leaf text-forest'}`}>{item.recording_count}</span>
                       </span>
                     </button>
@@ -87,7 +97,7 @@ export function SpeciesPage() {
           )}
         </aside>
 
-        <main>
+        <main ref={profileRef} className="order-1 lg:order-2">
           {profileStatus === 'loading' && <div className="rounded-3xl border border-forest/10 bg-paper p-8 text-sm text-muted">Loading species profile and map…</div>}
           {profileStatus === 'error' && <div className="rounded-3xl border border-sarawak-red/20 bg-sarawak-red/8 p-6 text-sm text-sarawak-red">The local profile could not be loaded. Please try a different species.</div>}
           {profile && <SpeciesProfileCard profile={profile} />}
