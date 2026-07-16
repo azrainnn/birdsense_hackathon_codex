@@ -25,7 +25,7 @@ SPECTROGRAM_DIR: Path = _ROOT / "spectrograms"
 DB_PATH: Path = _ROOT / "birdsense.db"
 SPECIES_CSV_PATH: Path = _ROOT.parent / "species_selected.csv"
 
-ALLOWED_AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a"}
+ALLOWED_AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".webm"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_NOTES_LENGTH = 1_000
 
