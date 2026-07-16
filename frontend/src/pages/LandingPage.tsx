@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { Icon } from '../components/Icon'
@@ -23,9 +24,9 @@ const FEATURES = [
   },
 ]
 
-function SoundscapeArtwork() {
+function SoundscapeArtwork({ className = '' }: { className?: string }) {
   return (
-    <div className="grain relative isolate min-h-80 overflow-hidden rounded-3xl border border-paper/15 bg-[#0b2a22] p-5 shadow-2xl shadow-ink/20 sm:min-h-[420px]">
+    <div className={`grain relative isolate min-h-80 overflow-hidden rounded-3xl border border-paper/15 bg-[#0b2a22] p-5 shadow-2xl shadow-ink/20 sm:min-h-[420px] ${className}`}>
       <div className="absolute -top-24 -right-10 h-64 w-64 animate-drift rounded-full border-[42px] border-sarawak-yellow/20 motion-reduce:animate-none" />
       <div className="absolute top-8 right-10 h-28 w-28 animate-drift rounded-full bg-sarawak-red/30 blur-2xl motion-reduce:animate-none" style={{ animationDelay: '-3.5s' }} />
       <div className="absolute bottom-0 left-0 h-48 w-full bg-[radial-gradient(ellipse_at_center_bottom,_rgb(34_103_77/80%),_transparent_70%)]" />
@@ -63,10 +64,86 @@ function SoundscapeArtwork() {
   )
 }
 
+function ScrollExpandHero() {
+  const [progress, setProgress] = useState(0)
+  const progressRef = useRef(0)
+  const touchY = useRef<number | null>(null)
+
+  function setExpansion(value: number) {
+    const next = Math.max(0, Math.min(1, value))
+    progressRef.current = next
+    setProgress(next)
+  }
+
+  useEffect(() => {
+    const onWheel = (event: WheelEvent) => {
+      const atTop = window.scrollY <= 4
+      const expanded = progressRef.current >= 0.995
+      if (!atTop || (expanded && event.deltaY > 0)) return
+      event.preventDefault()
+      setExpansion(expanded && event.deltaY < 0 ? 0.94 : progressRef.current + event.deltaY * 0.00115)
+    }
+    const onScroll = () => {
+      if (progressRef.current < 0.995 && window.scrollY > 0) window.scrollTo(0, 0)
+    }
+    const onTouchStart = (event: TouchEvent) => { touchY.current = event.touches[0]?.clientY ?? null }
+    const onTouchMove = (event: TouchEvent) => {
+      if (touchY.current === null) return
+      const currentY = event.touches[0]?.clientY
+      if (currentY === undefined) return
+      const delta = touchY.current - currentY
+      const atTop = window.scrollY <= 4
+      const expanded = progressRef.current >= 0.995
+      if (atTop && (!expanded || delta < -16)) {
+        event.preventDefault()
+        setExpansion(expanded && delta < -16 ? 0.94 : progressRef.current + delta * (delta < 0 ? 0.0075 : 0.0055))
+      }
+      touchY.current = currentY
+    }
+    const onTouchEnd = () => { touchY.current = null }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [])
+
+  const expanded = progress >= 0.995
+  const width = 340 + progress * 1100
+  const height = 320 + progress * 430
+  const titleShift = progress * 16
+
+  return (
+    <section className="page-grid relative flex min-h-[calc(100svh-4.5rem)] items-center justify-center overflow-hidden border-b border-forest/10 bg-canvas px-5 py-10 sm:px-8">
+      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_80%_25%,rgb(245_200_66_/_40%),transparent_24rem),radial-gradient(circle_at_16%_84%,rgb(180_43_50_/_18%),transparent_28rem)]" style={{ opacity: 1 - progress }} />
+      <div className="relative z-10 flex w-full max-w-7xl flex-col items-center justify-center">
+        <div className="relative overflow-hidden rounded-3xl border border-paper/30 bg-ink shadow-2xl shadow-ink/25 transition-[width,height] duration-150 ease-out" style={{ width: `min(${width}px, 95vw)`, height: `min(${height}px, 76svh)` }}>
+          <SoundscapeArtwork className="h-full min-h-0 rounded-none border-0 shadow-none sm:min-h-0" />
+          <div aria-hidden="true" className="absolute inset-0 bg-ink transition-opacity duration-150" style={{ opacity: 0.34 - progress * 0.24 }} />
+          {!expanded && <button type="button" onClick={() => setExpansion(1)} className="absolute right-5 bottom-5 rounded-full border border-paper/40 bg-ink/65 px-4 py-2 text-xs font-bold tracking-[0.12em] text-paper uppercase backdrop-blur transition hover:border-sarawak-yellow hover:bg-sarawak-yellow hover:text-ink">Scroll to expand</button>}
+        </div>
+        <h1 className="pointer-events-none relative z-20 -mt-2 flex flex-col items-center text-center text-5xl font-semibold leading-[0.86] tracking-[-0.06em] text-paper mix-blend-difference sm:text-7xl lg:text-8xl">
+          <span className="transition-transform duration-150 ease-out" style={{ transform: `translateX(-${titleShift}vw)` }}>Hear the forest.</span>
+          <span className="transition-transform duration-150 ease-out" style={{ transform: `translateX(${titleShift}vw)` }}>Understand the signal.</span>
+        </h1>
+        <p className="absolute -bottom-8 text-xs font-bold tracking-[0.16em] text-forest/70 uppercase">{expanded ? 'Explore the field guide below' : 'Scroll or swipe to expand'}</p>
+      </div>
+    </section>
+  )
+}
+
 export function LandingPage() {
   return (
     <div>
-      <section className="page-grid border-b border-forest/10 bg-canvas">
+      <ScrollExpandHero />
+      <section className="hidden">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[1.04fr_.96fr] lg:items-center lg:gap-14">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-sarawak-yellow/60 bg-sarawak-yellow/15 px-3 py-1.5 text-xs font-bold tracking-[0.12em] text-forest uppercase">
