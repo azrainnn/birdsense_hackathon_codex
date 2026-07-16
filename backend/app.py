@@ -28,6 +28,7 @@ SPECIES_CSV_PATH: Path = _ROOT.parent / "species_selected.csv"
 ALLOWED_AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".webm"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_NOTES_LENGTH = 1_000
+IDENTIFICATION_CONFIDENCE_THRESHOLD = 0.40
 HABITAT_TYPES = {"Primary forest", "Secondary forest", "Forest edge", "Riverine forest", "Gardens or settlement", "Unknown"}
 WEATHER_CONDITIONS = {"Clear", "Overcast", "Light rain", "Heavy rain", "Windy", "Unknown"}
 
@@ -136,6 +137,14 @@ def _quality_summary(result: dict[str, object]) -> tuple[dict[str, str], bool]:
     agreeing = sum(1 for event in timeline if event["species"] == species)
     agreement = agreeing / len(timeline) if timeline else 1.0
 
+    if confidence <= IDENTIFICATION_CONFIDENCE_THRESHOLD:
+        return (
+            {
+                "label": "Unable to identify",
+                "message": "BirdSense could not identify a bird species from this recording with enough confidence. Try a clearer or longer clip, then review the low-confidence alternatives only as clues.",
+            },
+            True,
+        )
     if confidence < 0.55:
         return (
             {
@@ -204,9 +213,11 @@ def predict_route():
             return jsonify({"error": "Could not extract bird-call features from this file."}), 422
 
         result = inference.predict(embeddings)
-        species = str(result["species"])
+        leading_species = str(result["species"])
         confidence = float(result["confidence"])
         quality, needs_review = _quality_summary(result)
+        is_identified = confidence > IDENTIFICATION_CONFIDENCE_THRESHOLD
+        species = leading_species if is_identified else "unidentified"
         spectrogram_info = preprocessing.generate_spectrogram(str(audio_path), str(spectrogram_path))
     except Exception:
         _remove_file(audio_path)
@@ -244,6 +255,7 @@ def predict_route():
         {
             "id": upload_id,
             "species": species,
+            "is_identified": is_identified,
             "confidence": round(confidence, 4),
             "quality": quality,
             "needs_review": needs_review,
@@ -394,7 +406,7 @@ def analytics_route():
         verified_count = conn.execute("SELECT COUNT(*) FROM feedback WHERE verdict = 'confirmed'").fetchone()[0]
         observation_count = conn.execute("SELECT COUNT(*) FROM observations").fetchone()[0]
         rows = conn.execute(
-            "SELECT species, COUNT(*) AS count FROM predictions GROUP BY species ORDER BY count DESC, species ASC LIMIT 5"
+            "SELECT species, COUNT(*) AS count FROM predictions WHERE species != 'unidentified' GROUP BY species ORDER BY count DESC, species ASC LIMIT 5"
         ).fetchall()
 
     return jsonify(

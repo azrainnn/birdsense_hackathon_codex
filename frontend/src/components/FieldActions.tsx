@@ -75,7 +75,7 @@ export function FieldActions({ result, profile, species }: FieldActionsProps) {
   }
 
   return (
-    <section className="rounded-2xl border border-forest/10 bg-paper p-5" aria-labelledby="field-actions-title">
+    <section id="field-actions" className="rounded-2xl border border-forest/10 bg-paper p-5" aria-labelledby="field-actions-title">
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sarawak-yellow text-ink"><Icon name="shield" className="h-5 w-5" /></span>
         <div>

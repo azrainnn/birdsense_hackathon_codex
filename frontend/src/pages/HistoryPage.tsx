@@ -70,7 +70,7 @@ export function HistoryPage() {
                 <span className="text-sm text-muted">{filteredEntries.length} shown</span>
               </div>
               {filteredEntries.length === 0 ? (
-                <div className="mt-4 rounded-3xl border border-dashed border-forest/20 bg-paper p-8 text-center text-sm text-muted">No analyses match this view yet. Return to Identify to analyse a recording.</div>
+                <div className="mt-4 rounded-3xl border border-dashed border-forest/20 bg-paper p-8 text-center"><span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-leaf text-forest"><Icon name="audio" className="h-5 w-5" /></span><p className="mt-4 text-sm font-semibold text-forest">No analyses in this view yet</p><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">Make a recording in Identify and it will appear here with its audio, evidence and review cue.</p></div>
               ) : (
                 <ul className="mt-4 space-y-3">
                   {filteredEntries.map((entry) => (

@@ -92,7 +92,7 @@ export function SpeciesPage() {
                   </li>
                 )
               })}
-              {visibleSpecies.length === 0 && <li className="p-3 text-sm text-muted">No species match that search.</li>}
+              {visibleSpecies.length === 0 && <li className="m-2 rounded-2xl border border-dashed border-forest/20 bg-canvas p-5 text-center"><span className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-leaf text-forest"><Icon name="sparkle" className="h-4 w-4" /></span><p className="mt-3 text-sm font-semibold text-forest">No guide match yet</p><p className="mt-1 text-xs leading-5 text-muted">Try a shorter common name or the scientific name.</p></li>}
             </ul>
           )}
         </aside>

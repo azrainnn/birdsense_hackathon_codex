@@ -36,7 +36,9 @@ export function IdentifyPage() {
       const prediction = await predictSpecies(file)
       setResult(prediction)
       setStatus('success')
-      fetchSpeciesProfile(prediction.species).then(setProfile).catch(() => setProfile(undefined))
+      if (prediction.is_identified ?? prediction.confidence > 0.4) {
+        fetchSpeciesProfile(prediction.species).then(setProfile).catch(() => setProfile(undefined))
+      }
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Something went wrong while analysing that recording.')
       setStatus('error')

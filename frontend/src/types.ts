@@ -16,7 +16,7 @@ export interface SpectrogramPlotBounds {
   bottom: number
 }
 
-export type QualityLabel = 'Suitable' | 'Review recommended' | 'Low confidence'
+export type QualityLabel = 'Suitable' | 'Review recommended' | 'Low confidence' | 'Unable to identify'
 
 export interface PredictionQuality {
   label: QualityLabel
@@ -33,6 +33,7 @@ export interface TimelineEvent {
 export interface PredictionResult {
   species: string
   confidence: number
+  is_identified?: boolean
   spectrogram_url: string
   spectrogram_duration_seconds: number
   spectrogram_plot_bounds: SpectrogramPlotBounds
