@@ -1,32 +1,32 @@
-# React + TypeScript + Vite
+# BirdSense web interface
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React/Vite interface provides:
 
-Currently, two official plugins are available:
+- A Sarawak-inspired landing page and audio-identification workspace.
+- A privacy-aware species encyclopedia with broad Sarawak habitat-region guides.
+- Candidate comparison, an approximate per-window detection timeline, and human verification controls.
+- A local field log with recent analyses and lightweight summary counts.
+- A small progressive-web-app shell for returning to the field guide when connectivity is limited.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run locally
 
-## React Compiler
+Start the Flask API from the repository root:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+python -m pip install -r backend/requirements.txt
+python backend/app.py
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+In a second terminal, run the web app:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open the local Vite URL shown in the terminal.
+
+## Important data notes
+
+The range map displays deliberately broad habitat regions, not sightings or exact distribution boundaries. Sensitive species never expose precise locations. The field-guide conservation labels are presentation context and should be refreshed against an authoritative conservation source before a public release.

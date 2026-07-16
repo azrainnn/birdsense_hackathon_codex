@@ -1,62 +1,8 @@
 import { useState } from 'react'
 import type { TopPrediction } from '../types'
-import { formatConfidencePercent, formatSpeciesName, speciesPhotoPosition } from '../utils'
+import { formatConfidencePercent, formatSpeciesName } from '../utils'
 
-interface TopPredictionsListProps {
-  predictions: TopPrediction[]
-}
-
-interface TopPredictionRowProps {
-  prediction: TopPrediction
-  rank: number
-  showPhoto: boolean
-}
-
-function TopPredictionRow({ prediction, rank, showPhoto }: TopPredictionRowProps) {
-  const [imageFailed, setImageFailed] = useState(false)
-  const displayName = formatSpeciesName(prediction.species)
-
-  return (
-    <li className="space-y-4 text-sm">
-      <div className="flex items-center gap-3">
-        <span className="w-5 text-gray-500">#{rank}</span>
-        <span className="w-40 shrink-0 truncate text-gray-200">{displayName}</span>
-        <div className="h-1.5 flex-1 rounded-full bg-white/10">
-          <div
-            className="h-1.5 rounded-full bg-accent"
-            style={{ width: `${Math.round(prediction.confidence * 100)}%` }}
-          />
-        </div>
-        <span className="w-12 shrink-0 text-right text-gray-400">
-          {formatConfidencePercent(prediction.confidence)}
-        </span>
-      </div>
-      {showPhoto && !imageFailed && (
-        <img
-          src={`/species/${prediction.species}.jpg`}
-          alt={displayName}
-          className="w-full rounded-lg"
-          onError={() => setImageFailed(true)}
-        />
-      )}
-    </li>
-  )
-}
-
-export function TopPredictionsList({ predictions }: TopPredictionsListProps) {
-  return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-medium text-gray-300">Other candidates</h3>
-      <ul className="space-y-4">
-        {predictions.map((prediction, index) => (
-          <TopPredictionRow
-            key={prediction.species}
-            prediction={prediction}
-            rank={index + 1}
-            showPhoto={index === 0}
-          />
-        ))}
-      </ul>
-    </div>
-  )
+export function TopPredictionsList({ predictions }: { predictions: TopPrediction[] }) {
+  const [failedImages, setFailedImages] = useState<string[]>([])
+  return <div className="rounded-2xl border border-forest/10 bg-canvas p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-ink">Candidate comparison</h3><span className="text-xs text-muted">Review the alternatives</span></div><ul className="mt-4 space-y-4">{predictions.map((prediction, index) => <li key={prediction.species} className="text-sm"><div className="grid grid-cols-[24px_minmax(0,1fr)_48px] items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-paper text-xs font-bold text-sarawak-red">{index + 1}</span><span className="min-w-0 truncate font-medium text-forest">{formatSpeciesName(prediction.species)}</span><span className="text-right text-xs font-semibold text-forest">{formatConfidencePercent(prediction.confidence)}</span><div className="col-span-3 h-1.5 overflow-hidden rounded-full bg-paper shadow-inner"><div className={`h-full rounded-full ${index === 0 ? 'bg-sarawak-red' : 'bg-forest/70'}`} style={{ width: `${Math.round(prediction.confidence * 100)}%` }} /></div></div>{index === 0 && !failedImages.includes(prediction.species) && <img src={`/species/${prediction.species}.jpg`} alt={formatSpeciesName(prediction.species)} className="mt-3 w-full rounded-xl" onError={() => setFailedImages([...failedImages, prediction.species])} />}</li>)}</ul></div>
 }

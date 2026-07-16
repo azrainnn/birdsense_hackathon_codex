@@ -1,4 +1,12 @@
-import type { HistoryEntry, PredictionResult, SpeciesInfo } from './types'
+import type {
+  AnalyticsSummary,
+  FieldFeedback,
+  HistoryEntry,
+  Observation,
+  PredictionResult,
+  SpeciesInfo,
+  SpeciesProfile,
+} from './types'
 
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
@@ -39,4 +47,39 @@ export async function fetchSpecies(): Promise<SpeciesInfo[]> {
     throw new Error(await parseErrorMessage(response))
   }
   return (await response.json()) as SpeciesInfo[]
+}
+
+export async function fetchSpeciesProfile(speciesName: string): Promise<SpeciesProfile> {
+  const response = await fetch(`/species/${encodeURIComponent(speciesName)}`)
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response))
+  }
+  return (await response.json()) as SpeciesProfile
+}
+
+async function postJson<T>(path: string, payload: T): Promise<void> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response))
+  }
+}
+
+export function submitFeedback(feedback: FieldFeedback): Promise<void> {
+  return postJson('/feedback', feedback)
+}
+
+export function submitObservation(observation: Observation): Promise<void> {
+  return postJson('/observations', observation)
+}
+
+export async function fetchAnalytics(): Promise<AnalyticsSummary> {
+  const response = await fetch('/analytics')
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response))
+  }
+  return (await response.json()) as AnalyticsSummary
 }
