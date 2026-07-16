@@ -24,6 +24,9 @@ const FEATURES = [
   },
 ]
 
+const HERO_BIRD_IMAGE = 'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=1800&q=90'
+const HERO_FOREST_IMAGE = 'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=2400&q=90'
+
 function SoundscapeArtwork({ className = '' }: { className?: string }) {
   return (
     <div className={`grain relative isolate min-h-80 overflow-hidden rounded-3xl border border-paper/15 bg-[#0b2a22] p-5 shadow-2xl shadow-ink/20 sm:min-h-[420px] ${className}`}>
@@ -122,12 +125,17 @@ function ScrollExpandHero() {
 
   return (
     <section className="page-grid relative flex min-h-[calc(100svh-4.5rem)] items-center justify-center overflow-hidden border-b border-forest/10 bg-canvas px-5 py-10 sm:px-8">
-      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_80%_25%,rgb(245_200_66_/_40%),transparent_24rem),radial-gradient(circle_at_16%_84%,rgb(180_43_50_/_18%),transparent_28rem)]" style={{ opacity: 1 - progress }} />
+      <img aria-hidden="true" src={HERO_FOREST_IMAGE} alt="" className="absolute inset-0 h-full w-full object-cover transition-opacity duration-150" style={{ opacity: 1 - progress }} />
+      <div aria-hidden="true" className="absolute inset-0 bg-ink/55 transition-opacity duration-150" style={{ opacity: 1 - progress * 0.35 }} />
+      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,transparent_0%,rgb(9_29_24_/_15%)_35%,rgb(9_29_24_/_72%)_100%)] transition-opacity duration-150" style={{ opacity: 1 - progress }} />
       <div className="relative z-10 flex w-full max-w-7xl flex-col items-center justify-center">
         <div className="relative overflow-hidden rounded-3xl border border-paper/30 bg-ink shadow-2xl shadow-ink/25 transition-[width,height] duration-150 ease-out" style={{ width: `min(${width}px, 95vw)`, height: `min(${height}px, 76svh)` }}>
-          <SoundscapeArtwork className="h-full min-h-0 rounded-none border-0 shadow-none sm:min-h-0" />
-          <div aria-hidden="true" className="absolute inset-0 bg-ink transition-opacity duration-150" style={{ opacity: 0.34 - progress * 0.24 }} />
-          {!expanded && <button type="button" onClick={() => setExpansion(1)} className="absolute right-5 bottom-5 rounded-full border border-paper/40 bg-ink/65 px-4 py-2 text-xs font-bold tracking-[0.12em] text-paper uppercase backdrop-blur transition hover:border-sarawak-yellow hover:bg-sarawak-yellow hover:text-ink">Scroll to expand</button>}
+          <img src={HERO_BIRD_IMAGE} alt="A bird perched in the forest canopy" className="h-full w-full object-cover" />
+          <div aria-hidden="true" className="absolute inset-0 bg-ink transition-opacity duration-150" style={{ opacity: 0.62 - progress * 0.4 }} />
+          <div className="absolute right-5 bottom-5 left-5 flex items-end justify-between gap-4 text-paper sm:right-7 sm:bottom-7 sm:left-7">
+            <p className="max-w-48 text-[0.62rem] font-bold tracking-[0.16em] text-paper/85 uppercase sm:max-w-none sm:text-xs">BirdSense · Field intelligence for living landscapes</p>
+            {!expanded && <button type="button" onClick={() => setExpansion(1)} className="shrink-0 rounded-full border border-paper/40 bg-ink/65 px-4 py-2 text-xs font-bold tracking-[0.12em] text-paper uppercase backdrop-blur transition hover:border-sarawak-yellow hover:bg-sarawak-yellow hover:text-ink">Scroll to expand</button>}
+          </div>
         </div>
         <h1 className="pointer-events-none relative z-20 -mt-2 flex flex-col items-center text-center text-5xl font-semibold leading-[0.86] tracking-[-0.06em] text-paper mix-blend-difference sm:text-7xl lg:text-8xl">
           <span className="transition-transform duration-150 ease-out" style={{ transform: `translateX(-${titleShift}vw)` }}>Hear the forest.</span>
