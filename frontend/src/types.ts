@@ -3,12 +3,28 @@ export interface TopPrediction {
   confidence: number
 }
 
+export interface WindowPrediction {
+  start_time: number
+  end_time: number
+  confidence: number
+}
+
+export interface SpectrogramPlotBounds {
+  left: number
+  right: number
+  top: number
+  bottom: number
+}
+
 export interface PredictionResult {
   species: string
   confidence: number
   spectrogram_url: string
+  spectrogram_duration_seconds: number
+  spectrogram_plot_bounds: SpectrogramPlotBounds
   audio_url: string
   top_predictions: TopPrediction[]
+  window_predictions: WindowPrediction[]
 }
 
 export interface HistoryEntry {

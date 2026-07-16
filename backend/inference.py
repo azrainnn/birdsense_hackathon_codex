@@ -26,7 +26,7 @@ _output_index: int = _interpreter.get_output_details()[0]["index"]
 _class_names: list[str] = _LABELS_PATH.read_text(encoding="utf-8").splitlines()
 
 
-def predict(embeddings: list[np.ndarray]) -> dict[str, object]:
+def predict(windows: list[dict[str, object]]) -> dict[str, object]:
     """Predict a species from one or more BirdNET window embeddings.
 
     Runs the classifier head on all window embeddings in one batch and
@@ -34,16 +34,20 @@ def predict(embeddings: list[np.ndarray]) -> dict[str, object]:
     ranks candidate species by that mean probability.
 
     Args:
-        embeddings: List of 1024-d BirdNET embedding vectors, one per
-            window (see preprocessing.extract_embeddings).
+        windows: List of dicts, one per BirdNET window, each with
+            "start_time", "end_time" (seconds) and "embedding" (a 1024-d
+            BirdNET embedding vector) — see preprocessing.extract_embeddings.
 
     Returns:
         Dict with "species" (top predicted species name), "confidence"
-        (its mean probability across windows, in [0, 1]), and
-        "top_predictions" (the top TOP_K species ranked by mean
-        probability, each a dict with "species" and "confidence").
+        (its mean probability across windows, in [0, 1]), "top_predictions"
+        (the top TOP_K species ranked by mean probability, each a dict with
+        "species" and "confidence"), and "window_predictions" (one dict per
+        input window with "start_time", "end_time", and "confidence" — that
+        window's individual probability for the predicted species, before
+        averaging).
     """
-    batch = np.stack(embeddings).astype(np.float32)
+    batch = np.stack([w["embedding"] for w in windows]).astype(np.float32)
     _interpreter.resize_tensor_input(_input_index, list(batch.shape))
     _interpreter.allocate_tensors()
     _interpreter.set_tensor(_input_index, batch)
@@ -57,8 +61,19 @@ def predict(embeddings: list[np.ndarray]) -> dict[str, object]:
         for i in ranked_indices
     ]
 
+    top_species_index = ranked_indices[0]
+    window_predictions = [
+        {
+            "start_time": w["start_time"],
+            "end_time": w["end_time"],
+            "confidence": float(probs[i, top_species_index]),
+        }
+        for i, w in enumerate(windows)
+    ]
+
     return {
         "species": top_predictions[0]["species"],
         "confidence": top_predictions[0]["confidence"],
         "top_predictions": top_predictions,
+        "window_predictions": window_predictions,
     }

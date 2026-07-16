@@ -33,31 +33,50 @@ _birdnetlib_analyzer.tflite.Interpreter = _patched_tflite_interpreter
 _analyzer = Analyzer()
 
 
-def extract_embeddings(audio_path: str) -> list[np.ndarray]:
+def extract_embeddings(audio_path: str) -> list[dict[str, object]]:
     """Extract one 1024-d BirdNET embedding per internal 3-second window.
 
     Args:
         audio_path: Path to an audio file (any format librosa can read).
 
     Returns:
-        List of float32 arrays of shape (1024,), one per BirdNET window.
-        Empty list if extraction yielded no windows.
+        List of dicts, one per BirdNET window, each with "start_time" and
+        "end_time" (seconds, floats) and "embedding" (float32 array of
+        shape (1024,)). Empty list if extraction yielded no windows.
     """
     recording = Recording(_analyzer, audio_path)
     recording.extract_embeddings()
     if not recording.embeddings:
         return []
-    return [np.array(w["embeddings"], dtype=np.float32) for w in recording.embeddings]
+    return [
+        {
+            "start_time": float(w["start_time"]),
+            "end_time": float(w["end_time"]),
+            "embedding": np.array(w["embeddings"], dtype=np.float32),
+        }
+        for w in recording.embeddings
+    ]
 
 
-def generate_spectrogram(audio_path: str, output_path: str) -> None:
+def generate_spectrogram(audio_path: str, output_path: str) -> dict[str, object]:
     """Render a mel-spectrogram PNG for the results dashboard.
 
     Args:
         audio_path: Path to the source audio file.
         output_path: Where to save the rendered PNG image.
+
+    Returns:
+        Dict with "duration_seconds" (float, the clip's real length) and
+        "plot_bounds" (dict with "left", "right", "top", "bottom", each a
+        percentage in [0, 100]) giving the plotted axes' position within
+        the saved image in CSS-inset terms. Read from matplotlib's own
+        layout (via Axes.get_position(), after tight_layout()) rather than
+        assumed, since margins shift slightly with sample rate and clip
+        duration — lets the frontend overlay boxes on the image precisely
+        for any clip without hardcoding matplotlib's margins.
     """
     waveform, sr = librosa.load(audio_path, sr=None, mono=True)
+    duration_seconds = librosa.get_duration(y=waveform, sr=sr)
     mel = librosa.feature.melspectrogram(y=waveform, sr=sr)
     mel_db = librosa.power_to_db(mel, ref=np.max)
 
@@ -66,4 +85,15 @@ def generate_spectrogram(audio_path: str, output_path: str) -> None:
     ax.set_title("Mel-spectrogram")
     fig.tight_layout()
     fig.savefig(output_path, dpi=100)
+    bbox = ax.get_position()
     plt.close(fig)
+
+    return {
+        "duration_seconds": float(duration_seconds),
+        "plot_bounds": {
+            "left": bbox.x0 * 100,
+            "right": (1 - bbox.x1) * 100,
+            "top": (1 - bbox.y1) * 100,
+            "bottom": bbox.y0 * 100,
+        },
+    }

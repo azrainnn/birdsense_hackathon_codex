@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import type { PredictionResult } from '../types'
 import { formatSpeciesName } from '../utils'
 import { ConfidenceBadge } from './ConfidenceBadge'
+import { SpectrogramView } from './SpectrogramView'
 import { TopPredictionsList } from './TopPredictionsList'
+import { WindowConfidenceTimeline } from './WindowConfidenceTimeline'
 
 interface ResultsPanelProps {
   result: PredictionResult
@@ -10,6 +13,8 @@ interface ResultsPanelProps {
 }
 
 export function ResultsPanel({ result, scientificName, onReset }: ResultsPanelProps) {
+  const [hoveredWindowIndex, setHoveredWindowIndex] = useState<number | null>(null)
+
   return (
     <div className="space-y-6 rounded-xl border border-border bg-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -23,14 +28,22 @@ export function ResultsPanel({ result, scientificName, onReset }: ResultsPanelPr
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-gray-300">Spectrogram</h3>
-          <img
-            src={result.spectrogram_url}
+          <SpectrogramView
+            spectrogramUrl={result.spectrogram_url}
             alt={`Mel-spectrogram of the uploaded recording, predicted as ${formatSpeciesName(result.species)}`}
-            className="w-full rounded-lg border border-border"
+            windows={result.window_predictions}
+            plotBounds={result.spectrogram_plot_bounds}
+            durationSeconds={result.spectrogram_duration_seconds}
+            hoveredIndex={hoveredWindowIndex}
           />
           <audio controls src={result.audio_url} className="w-full">
             <track kind="captions" />
           </audio>
+          <WindowConfidenceTimeline
+            windows={result.window_predictions}
+            hoveredIndex={hoveredWindowIndex}
+            onHoverIndexChange={setHoveredWindowIndex}
+          />
         </div>
 
         <TopPredictionsList predictions={result.top_predictions} />

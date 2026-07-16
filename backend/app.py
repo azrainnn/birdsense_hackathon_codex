@@ -70,7 +70,7 @@ def predict_route():
 
     spectrogram_filename = f"{upload_id}.png"
     spectrogram_path = SPECTROGRAM_DIR / spectrogram_filename
-    preprocessing.generate_spectrogram(str(audio_path), str(spectrogram_path))
+    spectrogram_info = preprocessing.generate_spectrogram(str(audio_path), str(spectrogram_path))
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
@@ -84,10 +84,22 @@ def predict_route():
         "species": species,
         "confidence": round(confidence, 4),
         "spectrogram_url": f"/spectrograms/{spectrogram_filename}",
+        "spectrogram_duration_seconds": round(spectrogram_info["duration_seconds"], 2),
+        "spectrogram_plot_bounds": {
+            key: round(value, 3) for key, value in spectrogram_info["plot_bounds"].items()
+        },
         "audio_url": f"/uploads/{audio_filename}",
         "top_predictions": [
             {"species": p["species"], "confidence": round(p["confidence"], 4)}
             for p in result["top_predictions"]
+        ],
+        "window_predictions": [
+            {
+                "start_time": round(w["start_time"], 2),
+                "end_time": round(w["end_time"], 2),
+                "confidence": round(w["confidence"], 4),
+            }
+            for w in result["window_predictions"]
         ],
     })
 
@@ -143,4 +155,7 @@ def species_route():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # use_reloader=False: the reloader watches the whole backend/ folder,
+    # and /predict writes new files into uploads/ and spectrograms/ on
+    # every request — which triggers a mid-request restart and a 502.
+    app.run(debug=True, port=5000, use_reloader=False)

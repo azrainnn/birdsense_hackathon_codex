@@ -11,7 +11,7 @@ export default defineConfig({
     proxy: {
       '/predict': BACKEND_URL,
       '/history': BACKEND_URL,
-      '/species': BACKEND_URL,
+      '^/species$': BACKEND_URL,
       '/spectrograms': BACKEND_URL,
       '/uploads': BACKEND_URL,
     },
