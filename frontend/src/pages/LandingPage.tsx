@@ -75,7 +75,6 @@ function ScrollExpandHero() {
           <div aria-hidden="true" className="absolute inset-0 bg-ink transition-opacity duration-150" style={{ opacity: 0.62 - progress * 0.4 }} />
           <div className="absolute right-5 bottom-5 left-5 flex items-end justify-between gap-4 text-paper sm:right-7 sm:bottom-7 sm:left-7">
             <p className="max-w-48 text-[0.62rem] font-bold tracking-[0.16em] text-paper/85 uppercase sm:max-w-none sm:text-xs">BirdSense · Field intelligence for living landscapes</p>
-            {!expanded && <button type="button" onClick={() => setExpansion(1)} className="shrink-0 rounded-full border border-paper/40 bg-ink/65 px-4 py-2 text-xs font-bold tracking-[0.12em] text-paper uppercase backdrop-blur transition hover:border-sarawak-yellow hover:bg-sarawak-yellow hover:text-ink">Scroll to expand</button>}
           </div>
         </div>
         <h1 className="pointer-events-none relative z-20 -mt-2 flex flex-col items-center text-center text-5xl font-semibold leading-[0.86] tracking-[-0.06em] text-paper mix-blend-difference sm:text-7xl lg:text-8xl">
