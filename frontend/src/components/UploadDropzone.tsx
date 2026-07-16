@@ -16,11 +16,17 @@ function recordingExtension(mimeType: string) {
   return 'webm'
 }
 
+function formatDuration(seconds: number) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
 export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps) {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [recordedFile, setRecordedFile] = useState<File | null>(null)
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -35,6 +41,10 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
     const interval = window.setInterval(() => setRecordingSeconds((seconds) => seconds + 1), 1000)
     return () => window.clearInterval(interval)
   }, [isRecording])
+
+  useEffect(() => () => {
+    if (recordingPreviewUrl) URL.revokeObjectURL(recordingPreviewUrl)
+  }, [recordingPreviewUrl])
 
   function validateAndSelect(file: File) {
     const fileName = file.name.toLowerCase()
@@ -89,7 +99,8 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
           setValidationMessage('No audio was captured. Please try recording again.')
           return
         }
-        onFileSelected(recording)
+        setRecordedFile(recording)
+        setRecordingPreviewUrl(URL.createObjectURL(recording))
       }
       recorderRef.current = recorder
       setRecordingSeconds(0)
@@ -106,6 +117,12 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
   function stopRecording() {
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
     setIsRecording(false)
+  }
+
+  function discardRecording() {
+    setRecordedFile(null)
+    setRecordingPreviewUrl('')
+    setRecordingSeconds(0)
   }
 
   return (
@@ -136,16 +153,36 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
         <input ref={inputRef} type="file" accept={ACCEPTED_EXTENSIONS.join(',')} onChange={handleInputChange} className="hidden" />
       </div>
 
-      <div className="mt-4 flex flex-col items-center justify-between gap-4 rounded-2xl border border-forest/10 bg-canvas/70 px-5 py-4 sm:flex-row">
+      <div className={`mt-4 rounded-2xl border px-5 py-4 ${isRecording ? 'border-sarawak-red/40 bg-sarawak-red/8' : 'border-forest/10 bg-canvas/70'}`}>
+        {isRecording && (
+          <div className="mb-4 flex items-center justify-center gap-1.5" aria-label="Recording in progress">
+            {[16, 27, 20, 34, 23, 29, 17].map((height, index) => <span key={height} className="w-1.5 animate-pulse rounded-full bg-sarawak-red" style={{ height, animationDelay: `${index * 110}ms` }} />)}
+          </div>
+        )}
+        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
         <div className="flex items-center gap-3 text-center sm:text-left">
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isRecording ? 'bg-sarawak-red text-white' : 'bg-sarawak-yellow text-ink'}`}><Icon name="microphone" className="h-5 w-5" /></span>
-          <div><p className="text-sm font-semibold text-ink">Record from this device</p><p className="text-xs text-muted">{isRecording ? `Recording ${recordingSeconds}s - capture a clear call, then stop.` : 'Use your microphone instead of an existing file.'}</p></div>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isRecording ? 'bg-sarawak-red text-white shadow-[0_0_0_6px_rgb(187_42_45/12%)]' : 'bg-sarawak-yellow text-ink'}`}><Icon name="microphone" className="h-5 w-5" /></span>
+          <div><p className="text-sm font-semibold text-ink">{isRecording ? `REC ${formatDuration(recordingSeconds)}` : 'Record from this device'}</p><p className="text-xs text-muted">{isRecording ? 'Microphone is active. Keep the device pointed toward the call.' : 'Use your microphone instead of an existing file.'}</p></div>
         </div>
         <button type="button" onClick={isRecording ? stopRecording : startRecording} disabled={disabled} className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${isRecording ? 'bg-sarawak-red text-white hover:bg-sarawak-red/85' : 'bg-ink text-paper hover:bg-forest'}`}>
           <span className={`h-2 w-2 rounded-full ${isRecording ? 'bg-white' : 'bg-sarawak-yellow'}`} />
-          {isRecording ? 'Stop and identify' : 'Open microphone'}
+          {isRecording ? 'Stop recording' : 'Open microphone'}
         </button>
+        </div>
       </div>
+
+      {recordedFile && recordingPreviewUrl && !isRecording && (
+        <div className="mt-4 rounded-2xl border border-sarawak-yellow/55 bg-sarawak-yellow/12 p-4" aria-live="polite">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-xs font-bold tracking-[0.14em] text-sarawak-red uppercase">Recording ready</p><p className="mt-1 text-sm font-semibold text-ink">{formatDuration(recordingSeconds)} captured from this device</p></div>
+            <audio controls src={recordingPreviewUrl} className="h-10 w-full sm:max-w-xs"><track kind="captions" /></audio>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" onClick={() => onFileSelected(recordedFile)} disabled={disabled} className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition hover:bg-forest disabled:opacity-60">Identify this recording <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button type="button" onClick={discardRecording} disabled={disabled} className="rounded-xl border border-forest/20 px-4 py-2.5 text-sm font-semibold text-forest transition hover:bg-paper disabled:opacity-60">Discard</button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
