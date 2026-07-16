@@ -4,7 +4,6 @@ import { Icon } from '../components/Icon'
 import { SpeciesPhoto } from '../components/SpeciesPhoto'
 
 const HERO_BIRD_IMAGE = 'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=1800&q=90'
-const HERO_FOREST_IMAGE = 'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=2400&q=90'
 
 const FEATURES = [
   ['audio', 'Listen first', 'Evidence, not a black box', 'Compare the recording, spectrogram and ranked alternatives before acting on a result.'],
@@ -40,8 +39,9 @@ function ScrollExpandHero() {
   const titleShift = progress * 16
   return (
     <section className="relative flex min-h-[calc(100svh-4.5rem)] items-center justify-center overflow-hidden bg-ink px-5 py-10 sm:px-8">
-      <img aria-hidden="true" src={HERO_FOREST_IMAGE} alt="" className="absolute inset-0 h-full w-full object-cover transition-opacity duration-150" style={{ opacity: 1 - progress }} />
-      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,transparent_0%,rgb(9_29_24_/_12%)_34%,rgb(9_29_24_/_82%)_100%)] transition-opacity duration-150" style={{ opacity: 1 - progress }} />
+      <div aria-hidden="true" className="hero-dusk-bg absolute inset-0 transition-opacity duration-300" style={{ opacity: 1 - progress * 0.55 }} />
+      <div aria-hidden="true" className="hero-contours absolute inset-x-0 bottom-0 h-[78%] transition-opacity duration-300" style={{ opacity: 1 - progress * 0.88 }} />
+      <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,transparent_0%,rgb(4_18_15_/_8%)_34%,rgb(4_18_15_/_62%)_100%)] transition-opacity duration-150" style={{ opacity: 1 - progress }} />
       <div className="relative z-10 flex w-full max-w-7xl flex-col items-center justify-center">
         <div className="relative overflow-hidden rounded-[2rem] border border-paper/30 bg-ink shadow-2xl shadow-ink/35 transition-[width,height] duration-150 ease-out" style={{ width: `min(${width}px, 95vw)`, height: `min(${height}px, 76svh)` }}>
           <img src={HERO_BIRD_IMAGE} alt="A bird perched in the forest canopy" className="h-full w-full object-cover" />
