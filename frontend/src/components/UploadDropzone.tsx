@@ -20,6 +20,38 @@ function formatDuration(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+async function convertRecordingToWav(recording: File) {
+  const context = new AudioContext()
+  try {
+    const decoded = await context.decodeAudioData(await recording.arrayBuffer())
+    const frameCount = decoded.length
+    const wav = new ArrayBuffer(44 + frameCount * 2)
+    const view = new DataView(wav)
+    const writeText = (offset: number, value: string) => [...value].forEach((character, index) => view.setUint8(offset + index, character.charCodeAt(0)))
+    const sampleRate = decoded.sampleRate
+    writeText(0, 'RIFF')
+    view.setUint32(4, 36 + frameCount * 2, true)
+    writeText(8, 'WAVEfmt ')
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, 1, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * 2, true)
+    view.setUint16(32, 2, true)
+    view.setUint16(34, 16, true)
+    writeText(36, 'data')
+    view.setUint32(40, frameCount * 2, true)
+    const channels = Array.from({ length: decoded.numberOfChannels }, (_, index) => decoded.getChannelData(index))
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const sample = channels.reduce((sum, channel) => sum + channel[frame], 0) / channels.length
+      view.setInt16(44 + frame * 2, Math.max(-1, Math.min(1, sample)) * 0x7fff, true)
+    }
+    return new File([wav], 'birdsense-field-recording.wav', { type: 'audio/wav' })
+  } finally {
+    await context.close()
+  }
+}
+
 export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps) {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
@@ -27,6 +59,7 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [recordedFile, setRecordedFile] = useState<File | null>(null)
   const [recordingPreviewUrl, setRecordingPreviewUrl] = useState('')
+  const [isPreparingRecording, setIsPreparingRecording] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -41,6 +74,10 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
     const interval = window.setInterval(() => setRecordingSeconds((seconds) => seconds + 1), 1000)
     return () => window.clearInterval(interval)
   }, [isRecording])
+
+  useEffect(() => {
+    if (!disabled) setIsPreparingRecording(false)
+  }, [disabled])
 
   useEffect(() => () => {
     if (recordingPreviewUrl) URL.revokeObjectURL(recordingPreviewUrl)
@@ -125,6 +162,18 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
     setRecordingSeconds(0)
   }
 
+  async function identifyRecording() {
+    if (!recordedFile) return
+    setIsPreparingRecording(true)
+    setValidationMessage('')
+    try {
+      onFileSelected(await convertRecordingToWav(recordedFile))
+    } catch {
+      setValidationMessage('Could not prepare this recording for analysis. Please record again or upload a WAV file.')
+      setIsPreparingRecording(false)
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-forest/10 bg-paper p-4 shadow-[0_16px_48px_rgb(9_29_24/6%)] sm:p-6" aria-labelledby="upload-title">
       <div
@@ -178,8 +227,8 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
             <audio controls src={recordingPreviewUrl} className="h-10 w-full sm:max-w-xs"><track kind="captions" /></audio>
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" onClick={() => onFileSelected(recordedFile)} disabled={disabled} className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition hover:bg-forest disabled:opacity-60">Identify this recording <Icon name="arrow-right" className="h-4 w-4" /></button>
-            <button type="button" onClick={discardRecording} disabled={disabled} className="rounded-xl border border-forest/20 px-4 py-2.5 text-sm font-semibold text-forest transition hover:bg-paper disabled:opacity-60">Discard</button>
+            <button type="button" onClick={() => void identifyRecording()} disabled={disabled || isPreparingRecording} className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition hover:bg-forest disabled:opacity-60">{isPreparingRecording ? 'Preparing audio...' : 'Identify this recording'} <Icon name="arrow-right" className="h-4 w-4" /></button>
+            <button type="button" onClick={discardRecording} disabled={disabled || isPreparingRecording} className="rounded-xl border border-forest/20 px-4 py-2.5 text-sm font-semibold text-forest transition hover:bg-paper disabled:opacity-60">Discard</button>
           </div>
         </div>
       )}
