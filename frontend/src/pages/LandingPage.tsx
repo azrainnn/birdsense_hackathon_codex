@@ -26,13 +26,13 @@ const FEATURES = [
 function SoundscapeArtwork() {
   return (
     <div className="grain relative isolate min-h-80 overflow-hidden rounded-3xl border border-paper/15 bg-[#0b2a22] p-5 shadow-2xl shadow-ink/20 sm:min-h-[420px]">
-      <div className="absolute -top-24 -right-10 h-64 w-64 rounded-full border-[42px] border-sarawak-yellow/20" />
-      <div className="absolute top-8 right-10 h-28 w-28 rounded-full bg-sarawak-red/30 blur-2xl" />
+      <div className="absolute -top-24 -right-10 h-64 w-64 animate-drift rounded-full border-[42px] border-sarawak-yellow/20 motion-reduce:animate-none" />
+      <div className="absolute top-8 right-10 h-28 w-28 animate-drift rounded-full bg-sarawak-red/30 blur-2xl motion-reduce:animate-none" style={{ animationDelay: '-3.5s' }} />
       <div className="absolute bottom-0 left-0 h-48 w-full bg-[radial-gradient(ellipse_at_center_bottom,_rgb(34_103_77/80%),_transparent_70%)]" />
       <svg className="absolute inset-x-0 bottom-0 h-64 w-full" viewBox="0 0 530 280" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M0 227C55 185 85 222 130 190c31-22 48-62 87-46 33 14 44 50 83 35 47-18 56-75 102-66 45 9 48 49 128 10v157H0V227Z" fill="#1c5945" />
         <path d="M0 251c51-35 95-13 140-39 38-22 59-64 97-52 36 12 58 43 96 25 46-21 63-83 112-76 42 6 56 45 85 32v139H0v-29Z" fill="#123d32" />
-        <path d="M378 187c15-18 28-40 33-66 5-31-3-52-19-65 16 2 29 13 37 30 9 21 9 46 2 73-8 29-25 51-46 63-11 6-23 10-35 12 10-15 19-31 28-47Z" fill="#f5c842" />
+        <path className="animate-drift motion-reduce:animate-none" d="M378 187c15-18 28-40 33-66 5-31-3-52-19-65 16 2 29 13 37 30 9 21 9 46 2 73-8 29-25 51-46 63-11 6-23 10-35 12 10-15 19-31 28-47Z" fill="#f5c842" />
         <path d="M363 173c13-9 30-13 45-9 13 3 22 12 30 23-16 6-35 8-52 2-15-5-25-13-23-16Z" fill="#f7f3e8" />
         <path d="M348 184c10-16 22-24 38-26-11 12-17 27-19 46-3 23 5 38 20 46-21 2-38-7-48-24-10-18-7-31 9-42Z" fill="#091d18" />
         <circle cx="374" cy="176" r="3" fill="#f7f3e8" />

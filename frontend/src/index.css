@@ -15,6 +15,17 @@
   --color-sarawak-red-dark: #891c25;
   --color-signal: #167b69;
   --color-skywash: #dce9e3;
+  --animate-drift: drift 7s ease-in-out infinite;
+
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -12px, 0);
+    }
+  }
 }
 
 :root {
@@ -90,22 +101,8 @@ textarea {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .float-slow {
-    animation: float-slow 7s ease-in-out infinite;
-  }
-
   .pulse-ring {
     animation: pulse-ring 2.8s ease-out infinite;
-  }
-}
-
-@keyframes float-slow {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
   }
 }
 
