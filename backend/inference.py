@@ -18,6 +18,7 @@ _ROOT: Path = Path(__file__).parent.parent
 _MODEL_PATH: Path = _ROOT / "models" / "export" / "model.tflite"
 _LABELS_PATH: Path = _ROOT / "models" / "export" / "labels.txt"
 TOP_K: int = 3
+WINDOW_SECONDS: float = 3.0
 
 _interpreter = tflite.Interpreter(model_path=str(_MODEL_PATH))
 _input_index: int = _interpreter.get_input_details()[0]["index"]
@@ -39,9 +40,11 @@ def predict(embeddings: list[np.ndarray]) -> dict[str, object]:
 
     Returns:
         Dict with "species" (top predicted species name), "confidence"
-        (its mean probability across windows, in [0, 1]), and
+        (its mean probability across windows, in [0, 1]),
         "top_predictions" (the top TOP_K species ranked by mean
-        probability, each a dict with "species" and "confidence").
+        probability), and a coarse per-window timeline. The timeline is
+        labelled as approximate because BirdNET embeddings are extracted in
+        internal fixed windows rather than from a call-localisation model.
     """
     batch = np.stack(embeddings).astype(np.float32)
     _interpreter.resize_tensor_input(_input_index, list(batch.shape))
@@ -56,9 +59,21 @@ def predict(embeddings: list[np.ndarray]) -> dict[str, object]:
         {"species": _class_names[i], "confidence": float(mean_probs[i])}
         for i in ranked_indices
     ]
+    timeline = []
+    for index, window_probs in enumerate(probs):
+        top_index = int(np.argmax(window_probs))
+        timeline.append(
+            {
+                "start_seconds": index * WINDOW_SECONDS,
+                "end_seconds": (index + 1) * WINDOW_SECONDS,
+                "species": _class_names[top_index],
+                "confidence": float(window_probs[top_index]),
+            }
+        )
 
     return {
         "species": top_predictions[0]["species"],
         "confidence": top_predictions[0]["confidence"],
         "top_predictions": top_predictions,
+        "timeline": timeline,
     }

@@ -1,0 +1,17 @@
+{
+  "name": "BirdSense — Sarawak Field Guide",
+  "short_name": "BirdSense",
+  "description": "AI-assisted Bornean bird acoustic identification with a privacy-aware Sarawak field guide.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3e8",
+  "theme_color": "#091d18",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
