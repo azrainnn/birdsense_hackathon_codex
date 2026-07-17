@@ -64,6 +64,10 @@ data/external/
 *.wav
 *.mp3
 
+# Curated sample audio for easy identification testing (small subset of the
+# training hold-out set; see sample_audio/CREDITS.md for attribution)
+!sample_audio/**
+
 # Images (keep project assets but ignore large dataset images)
 datasets/
 images/raw/
