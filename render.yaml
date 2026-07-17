@@ -4,12 +4,5 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     healthCheckPath: /species
-    disk:
-      name: birdsense-data
-      mountPath: /var/data
-      sizeGB: 1
-    envVars:
-      - key: BIRDSENSE_DATA_DIR
-        value: /var/data
