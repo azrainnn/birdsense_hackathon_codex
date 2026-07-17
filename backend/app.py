@@ -8,6 +8,7 @@ the public interface.
 from __future__ import annotations
 
 import csv
+import os
 import sqlite3
 import uuid
 from pathlib import Path
@@ -20,10 +21,14 @@ from werkzeug.utils import secure_filename
 from species_profiles import get_profile
 
 _ROOT: Path = Path(__file__).parent
-UPLOAD_DIR: Path = _ROOT / "uploads"
-SPECTROGRAM_DIR: Path = _ROOT / "spectrograms"
-DB_PATH: Path = _ROOT / "birdsense.db"
+# Overridable so a deployment can point uploads/spectrograms/the db at a
+# mounted persistent disk instead of the (ephemeral, in-container) default.
+DATA_DIR: Path = Path(os.environ.get("BIRDSENSE_DATA_DIR", _ROOT))
+UPLOAD_DIR: Path = DATA_DIR / "uploads"
+SPECTROGRAM_DIR: Path = DATA_DIR / "spectrograms"
+DB_PATH: Path = DATA_DIR / "birdsense.db"
 SPECIES_CSV_PATH: Path = _ROOT.parent / "species_selected.csv"
+FRONTEND_DIST_DIR: Path = _ROOT.parent / "frontend" / "dist"
 
 ALLOWED_AUDIO_SUFFIXES = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".webm"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -32,8 +37,8 @@ IDENTIFICATION_CONFIDENCE_THRESHOLD = 0.40
 HABITAT_TYPES = {"Primary forest", "Secondary forest", "Forest edge", "Riverine forest", "Gardens or settlement", "Unknown"}
 WEATHER_CONDITIONS = {"Clear", "Overcast", "Light rain", "Heavy rain", "Windy", "Unknown"}
 
-UPLOAD_DIR.mkdir(exist_ok=True)
-SPECTROGRAM_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SPECTROGRAM_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
@@ -323,7 +328,16 @@ def species_route():
 
 @app.route("/species/<species_name>", methods=["GET"])
 def species_profile_route(species_name: str):
-    """Return field-guide context and a broad, privacy-safe Sarawak range guide."""
+    """Return field-guide context and a broad, privacy-safe Sarawak range guide.
+
+    Also serves the frontend's static species photos (e.g. "<name>.jpg") when
+    the frontend build is co-located, since both share the "/species/..." URL
+    space in a single-service deployment.
+    """
+    static_photo = FRONTEND_DIST_DIR / "species" / species_name
+    if static_photo.is_file():
+        return send_from_directory(FRONTEND_DIST_DIR / "species", species_name)
+
     metadata = _species_index().get(species_name)
     profile = get_profile(species_name)
     if metadata is None or profile is None:
@@ -418,6 +432,22 @@ def analytics_route():
             "top_species": [{"species": row[0], "count": row[1]} for row in rows],
         }
     )
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path: str):
+    """Serve the built frontend SPA for a single-service deployment.
+
+    Falls back to index.html for client-side routes (e.g. /identify,
+    /species, /field-log) so React Router can take over. All API routes
+    above are matched first regardless of registration order, since
+    Werkzeug prefers the more specific rule.
+    """
+    target = FRONTEND_DIST_DIR / path
+    if path and target.is_file():
+        return send_from_directory(FRONTEND_DIST_DIR, path)
+    return send_from_directory(FRONTEND_DIST_DIR, "index.html")
 
 
 if __name__ == "__main__":

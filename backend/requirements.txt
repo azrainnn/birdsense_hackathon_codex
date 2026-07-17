@@ -2,6 +2,7 @@
 # Install with: pip install -r backend/requirements.txt
 
 flask>=3.0
+gunicorn>=21
 
 # Audio & BirdNET embedding extraction
 librosa>=0.10

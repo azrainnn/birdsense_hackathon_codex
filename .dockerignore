@@ -1,0 +1,19 @@
+.git
+.gitignore
+
+frontend/node_modules
+frontend/dist
+
+landing-page/node_modules
+landing-page/.next
+
+backend/__pycache__
+backend/.venv313
+backend/uploads
+backend/spectrograms
+backend/birdsense.db
+
+notebooks
+research papers
+models/checkpoints
+BirdSense_Build_Guide_v2.docx
