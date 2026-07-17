@@ -79,7 +79,7 @@ outputs/
 results/
 checkpoints/
 
-# BirdSense export artifacts must be committed (see CLAUDE.md export gate)
+# BirdSense export artifacts must be committed 
 !models/export/*.tflite
 !models/checkpoints/
 models/checkpoints/*
@@ -93,9 +93,6 @@ models/checkpoints/*
 *~
 .DS_Store
 Thumbs.db
-
-# Claude Code settings (keep project-level, ignore local overrides)
-.claude/settings.local.json
 
 # Flask backend runtime artifacts (uploaded audio, generated spectrograms, DB)
 backend/birdsense.db
