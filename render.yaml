@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: birdsense
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /species

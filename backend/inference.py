@@ -40,12 +40,10 @@ def predict(windows: list[dict[str, object]]) -> dict[str, object]:
 
     Returns:
         Dict with "species" (top predicted species name), "confidence"
-        (its mean probability across windows, in [0, 1]), "top_predictions"
-        (the top TOP_K species ranked by mean probability, each a dict with
-        "species" and "confidence"), and "window_predictions" (one dict per
-        input window with "start_time", "end_time", and "confidence" — that
-        window's individual probability for the predicted species, before
-        averaging).
+        (its mean probability across windows, in [0, 1]),
+        "top_predictions" (the top TOP_K species ranked by mean probability),
+        per-window confidence for the leading candidate, and an approximate
+        timeline based on BirdNET's internal fixed windows.
     """
     batch = np.stack([w["embedding"] for w in windows]).astype(np.float32)
     _interpreter.resize_tensor_input(_input_index, list(batch.shape))
@@ -60,6 +58,17 @@ def predict(windows: list[dict[str, object]]) -> dict[str, object]:
         {"species": _class_names[i], "confidence": float(mean_probs[i])}
         for i in ranked_indices
     ]
+    timeline = []
+    for index, window_probs in enumerate(probs):
+        top_index = int(np.argmax(window_probs))
+        timeline.append(
+            {
+                "start_seconds": float(windows[index]["start_time"]),
+                "end_seconds": float(windows[index]["end_time"]),
+                "species": _class_names[top_index],
+                "confidence": float(window_probs[top_index]),
+            }
+        )
 
     top_species_index = ranked_indices[0]
     window_predictions = [
@@ -76,4 +85,5 @@ def predict(windows: list[dict[str, object]]) -> dict[str, object]:
         "confidence": top_predictions[0]["confidence"],
         "top_predictions": top_predictions,
         "window_predictions": window_predictions,
+        "timeline": timeline,
     }

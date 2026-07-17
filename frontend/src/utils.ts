@@ -11,6 +11,7 @@ export function speciesPhotoPosition(speciesName: string): string {
 }
 
 export function formatSpeciesName(speciesName: string): string {
+  if (speciesName === 'unidentified') return 'Unidentified recording'
   return speciesName
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
