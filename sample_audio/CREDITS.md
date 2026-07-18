@@ -1,6 +1,21 @@
 # Sample audio credits
 
-Clips in `sample_audio/` are a small curated subset (2 per species) of the project's training hold-out set, included so testers can try identification without sourcing their own recordings. Most were downloaded from [Xeno-canto](https://xeno-canto.org) via `scripts/downloader.py` and are credited below by catalog ID per Xeno-canto's reuse terms. A few came from other field-recording sources bundled into the original training data and could not be automatically traced — check before using them outside this demo.
+Clips in `sample_audio/` are a small curated subset (2 per species) of the project's training hold-out set, included so testers can try identification without sourcing their own recordings. Most were downloaded from [Xeno-canto](https://xeno-canto.org) via `scripts/downloader.py` and are credited below by catalogue ID.
+
+## Xeno-canto licence notice
+
+Each Xeno-canto recording is owned by its individual recordist and carries its
+own Creative Commons licence. The catalogue ID below is a source reference,
+**not** a statement that the clip has one common project-wide licence. Before
+reusing a clip, visit its linked Xeno-canto record, verify its current licence,
+and provide the required recordist, record ID/URL, licence, and modification
+attribution. Respect any non-commercial, no-derivatives, or share-alike terms.
+
+Entries marked **Unattributed / non-Xeno-canto source** have unverified
+provenance and must not be redistributed or used beyond this internal demo
+unless their rights holder and licence are identified. See the repository
+[`README.md`](../README.md#training-data-and-xeno-canto-licensing) for the
+project-wide dataset policy.
 
 | Species | File | Source |
 |---|---|---|
